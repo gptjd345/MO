@@ -1,0 +1,12 @@
+node_modules
+dist
+backend/target
+.git
+.gitignore
+*.md
+.replit
+replit.nix
+replit.md
+dump.rdb
+attached_assets
+.local

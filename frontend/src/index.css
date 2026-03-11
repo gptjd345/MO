@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Dark Theme Base */
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+
+  /* Cards & Elevating Elements */
+  --card: 217 33% 17%;
+  --card-foreground: 210 40% 98%;
+
+  /* Popovers */
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
+
+  /* Primary Brand Color - Electric Violet */
+  --primary: 263 70% 50%;
+  --primary-foreground: 210 40% 98%;
+
+  /* Secondary/Muted Actions */
+  --secondary: 217 19% 27%;
+  --secondary-foreground: 210 40% 98%;
+
+  /* Muted Text */
+  --muted: 217 19% 27%;
+  --muted-foreground: 215 20% 65%;
+
+  /* Accent - Teal/Cyan for success/highlights */
+  --accent: 180 100% 35%;
+  --accent-foreground: 210 40% 98%;
+
+  /* Destructive - Red */
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 210 40% 98%;
+
+  /* Borders & Inputs */
+  --border: 217 19% 27%;
+  --input: 217 19% 27%;
+  --ring: 263 70% 50%;
+
+  /* Radius */
+  --radius: 0.75rem;
+
+  /* Custom Fonts */
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary/30 selection:text-primary-foreground;
+    font-family: var(--font-body);
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    @apply tracking-tight;
+  }
+}
+
+/* Custom Utilities for Glassmorphism & Glows */
+@layer utilities {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-md border border-white/10 shadow-xl;
+  }
+  
+  .glow-text {
+    text-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+  }
+  
+  .input-transition {
+    @apply transition-all duration-200 focus:ring-2 focus:ring-primary/50 focus:border-primary/50;
+  }
+}
