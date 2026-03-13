@@ -2,7 +2,8 @@ import { ReactNode, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTodos } from "@/hooks/use-todos";
 import { Link } from "wouter";
-import { LogOut, LayoutDashboard, CheckCircle2, Crown, Zap, Check, X, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
+import { LogOut, LayoutDashboard, CheckCircle2, Crown, Zap, Check, X, Loader2, AlertTriangle, RefreshCw, Star, Heart } from "lucide-react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -320,6 +321,7 @@ export function LayoutShell({ children }: LayoutShellProps) {
   const { user, logoutMutation } = useAuth();
   const { todos } = useTodos();
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [location] = useLocation();
 
   const taskCount = todos.length;
   const isPro = user?.plan === "PRO";
@@ -336,20 +338,44 @@ export function LayoutShell({ children }: LayoutShellProps) {
 
         <nav className="flex-1 space-y-2">
           <Link href="/">
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary font-medium cursor-pointer transition-colors hover:bg-primary/20">
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors ${
+              location === "/"
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-white/5 hover:text-white"
+            }`}>
               <LayoutDashboard className="h-5 w-5" />
               <span>Dashboard</span>
+            </div>
+          </Link>
+
+          <Link href="/keepers">
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors ${
+              location === "/keepers"
+                ? "bg-amber-500/10 text-amber-400"
+                : "text-muted-foreground hover:bg-white/5 hover:text-white"
+            }`}>
+              <Heart className={`h-5 w-5 ${location === "/keepers" ? "fill-amber-400/20" : ""}`} />
+              <span>Keepers</span>
             </div>
           </Link>
         </nav>
 
         <div className="mt-auto pt-6 border-t border-white/5">
           <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold text-secondary-foreground">
-              {user?.email?.charAt(0).toUpperCase()}
+            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/40 to-purple-600/40 border border-white/10 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
+              {(user?.nickname ?? user?.email)?.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate" data-testid="text-user-email">{user?.email}</p>
+              <p className="text-sm font-semibold text-white truncate" data-testid="text-user-nickname">
+                {user?.nickname ?? user?.email?.split("@")[0]}
+              </p>
+              <p className="text-xs text-muted-foreground/60 truncate" data-testid="text-user-email">
+                {user?.email}
+              </p>
+              <div className="flex items-center gap-1 mt-0.5">
+                <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+                <span className="text-xs text-yellow-400 font-medium" data-testid="text-user-score">{user?.score ?? 0}점</span>
+              </div>
             </div>
           </div>
 

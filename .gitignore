@@ -50,3 +50,6 @@ attached_assets/
 # Redis
 *.rdb
 
+# Liquibase temp diff output
+**/db/changelog/diff/
+

@@ -19,8 +19,8 @@ export function useAuth() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: ({ email, password }: { email: string; password: string }) =>
-      register(email, password),
+    mutationFn: ({ email, password, nickname }: { email: string; password: string; nickname: string }) =>
+      register(email, password, nickname),
     onSuccess: () => {
       toast({ title: "Account created!", description: "Welcome aboard." });
     },

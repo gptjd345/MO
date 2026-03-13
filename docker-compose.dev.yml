@@ -26,27 +26,6 @@ services:
       timeout: 5s
       retries: 5
 
-  spring-boot:
-    image: maven:3.9-eclipse-temurin-17
-    working_dir: /app
-    volumes:
-      - ./backend:/app
-      - maven_cache:/root/.m2
-    env_file: .env.dev
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
-      JWT_SECRET: ${JWT_SECRET}
-    command: mvn spring-boot:run
-    ports:
-      - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
   node-dev:
     image: node:20-slim
     working_dir: /app
@@ -69,14 +48,16 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       JWT_SECRET: ${JWT_SECRET}
-      SPRING_BOOT_URL: ${SPRING_BOOT_URL}
+      SPRING_BOOT_URL: http://host.docker.internal:8080
     command: sh -c "npm install && npm run dev"
     ports:
       - "3001:3000"
     depends_on:
-      - spring-boot
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_dev_data:
-  maven_cache:
   node_modules:

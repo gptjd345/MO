@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 
 import AuthPage from "@/pages/auth-page";
 import DashboardPage from "@/pages/dashboard-page";
+import KeepersPage from "@/pages/keepers-page";
 import NotFound from "@/pages/not-found";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -35,6 +36,9 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
       <Route path="/">
         <ProtectedRoute component={DashboardPage} />
+      </Route>
+      <Route path="/keepers">
+        <ProtectedRoute component={KeepersPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

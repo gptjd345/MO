@@ -4,15 +4,18 @@ import { setToken, removeToken, tryRefresh, getToken } from "@/lib/queryClient";
 interface User {
   id: number;
   email: string;
+  nickname: string;
   plan: string;
+  score: number;
 }
 
 interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, nickname: string) => Promise<void>;
   logout: () => Promise<void>;
+  addScore: (points: number) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -53,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(err.message || "Login failed");
       }
       const data = await res.json();
-      const userData = { id: data.userId, email: data.email, plan: data.plan };
+      const userData = { id: data.userId, email: data.email, nickname: data.nickname ?? data.email.split("@")[0], plan: data.plan, score: data.score ?? 0 };
       setToken(data.accessToken);
       saveUser(userData);
       setUser(userData);
@@ -62,20 +65,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const register = useCallback(async (email: string, password: string) => {
+  const register = useCallback(async (email: string, password: string, nickname: string) => {
     setIsLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, nickname }),
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Registration failed");
       }
       const data = await res.json();
-      const userData = { id: data.userId, email: data.email, plan: data.plan };
+      const userData = { id: data.userId, email: data.email, nickname: data.nickname ?? nickname, plan: data.plan, score: data.score ?? 0 };
       setToken(data.accessToken);
       saveUser(userData);
       setUser(userData);
@@ -90,8 +93,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const addScore = useCallback((points: number) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, score: prev.score + points };
+      saveUser(updated);
+      return updated;
+    });
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, addScore }}>
       {children}
     </AuthContext.Provider>
   );

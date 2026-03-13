@@ -20,6 +20,7 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   email: z.string().email("Please enter a valid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
+  nickname: z.string().min(1, "닉네임을 입력해주세요").max(20, "닉네임은 20자 이하로 입력해주세요"),
 });
 
 export default function AuthPage() {
@@ -33,7 +34,7 @@ export default function AuthPage() {
 
   const registerForm = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: "", password: "", nickname: "" },
   });
 
   if (user) {
@@ -137,6 +138,26 @@ export default function AuthPage() {
                   <CardContent>
                     <Form {...registerForm}>
                       <form onSubmit={registerForm.handleSubmit((d) => registerMutation.mutate(d))} className="space-y-4">
+                        <FormField
+                          control={registerForm.control}
+                          name="nickname"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>닉네임</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="text"
+                                  placeholder="나만의 닉네임을 입력하세요"
+                                  className="bg-background/50 border-white/10 focus:border-primary/50"
+                                  data-testid="input-register-nickname"
+                                  maxLength={20}
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                         <FormField
                           control={registerForm.control}
                           name="email"

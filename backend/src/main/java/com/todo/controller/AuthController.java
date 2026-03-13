@@ -42,7 +42,7 @@ public class AuthController {
             setRefreshCookie(response, tokens.refreshToken());
             User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new AuthResponse(tokens.accessToken(), user.getId(), user.getEmail(), user.getPlan()));
+                    .body(new AuthResponse(tokens.accessToken(), user.getId(), user.getEmail(), user.getNickname(), user.getPlan(), user.getScore()));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
@@ -56,7 +56,7 @@ public class AuthController {
             setRefreshCookie(response, tokens.refreshToken());
             User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
             return ResponseEntity.ok(
-                    new AuthResponse(tokens.accessToken(), user.getId(), user.getEmail(), user.getPlan()));
+                    new AuthResponse(tokens.accessToken(), user.getId(), user.getEmail(), user.getNickname(), user.getPlan(), user.getScore()));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", e.getMessage()));
@@ -96,7 +96,7 @@ public class AuthController {
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(new UserResponse(user.getId(), user.getEmail(), user.getPlan()));
+        return ResponseEntity.ok(new UserResponse(user.getId(), user.getEmail(), user.getNickname(), user.getPlan(), user.getScore()));
     }
 
     private void setRefreshCookie(HttpServletResponse response, String token) {

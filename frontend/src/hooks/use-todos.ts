@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { getToken, tryRefresh } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
+
+export interface TodoUpdateResponse {
+  todo: Todo;
+  pointsEarned: number;
+}
 
 export interface Todo {
   id: number;
@@ -34,6 +40,7 @@ async function fetchWithRefresh(url: string, init: RequestInit = {}): Promise<Re
 export function useTodos() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { addScore } = useAuth();
 
   const todosQuery = useQuery<Todo[]>({
     queryKey: ["/api/todos"],
@@ -64,7 +71,7 @@ export function useTodos() {
   });
 
   const updateTodoMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: number; title?: string; content?: string; completed?: boolean; startDate?: string; endDate?: string; priority?: string }) => {
+    mutationFn: async ({ id, ...data }: { id: number; title?: string; content?: string; completed?: boolean; startDate?: string; endDate?: string; priority?: string }): Promise<TodoUpdateResponse> => {
       const res = await fetchWithRefresh(`/api/todos/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -73,8 +80,15 @@ export function useTodos() {
       if (!res.ok) throw new Error("Failed to update todo");
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      if (data.pointsEarned > 0) {
+        addScore(data.pointsEarned);
+        toast({
+          title: `+${data.pointsEarned}점 획득!`,
+          description: data.pointsEarned === 10 ? "기한 내 완료!" : "완료! (기한 초과)",
+        });
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });

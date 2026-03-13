@@ -2,6 +2,7 @@ package com.todo.controller;
 
 import com.todo.dto.TodoRequest;
 import com.todo.dto.TodoUpdateRequest;
+import com.todo.dto.TodoUpdateResponse;
 import com.todo.entity.Todo;
 import com.todo.entity.User;
 import com.todo.service.TodoService;
@@ -41,8 +42,8 @@ public class TodoController {
                                     @PathVariable Long id,
                                     @RequestBody TodoUpdateRequest request) {
         try {
-            Todo todo = todoService.updateTodo(id, user.getId(), request);
-            return ResponseEntity.ok(todo);
+            TodoUpdateResponse response = todoService.updateTodo(id, user.getId(), request);
+            return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", e.getMessage()));
