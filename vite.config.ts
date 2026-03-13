@@ -30,6 +30,14 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    host: true,
+    port: 3000,
+    proxy: {
+      "/api": {
+        target: process.env.API_URL || "http://localhost:8080",
+        changeOrigin: true,
+      },
+    },
     fs: {
       strict: true,
       deny: ["**/.*"],
