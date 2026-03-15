@@ -85,5 +85,5 @@ jobs:
 
             cd ~/app
             SPRING_IMAGE=$SPRING_IMAGE docker compose --env-file .env.prod -f docker-compose.prod.yml pull spring
-            SPRING_IMAGE=$SPRING_IMAGE docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --no-recreate postgres redis
+            SPRING_IMAGE=$SPRING_IMAGE docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
             docker image prune -f
