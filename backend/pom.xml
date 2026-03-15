@@ -11,8 +11,8 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.todo</groupId>
-    <artifactId>todo-app</artifactId>
+    <groupId>com.mo</groupId>
+    <artifactId>MO</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
     <name>Todo Application</name>
