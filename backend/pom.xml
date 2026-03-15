@@ -20,6 +20,7 @@
     <properties>
         <java.version>21</java.version>
         <jjwt.version>0.12.5</jjwt.version>
+        <liquibase.version>4.27.0</liquibase.version>
     </properties>
 
     <dependencies>
