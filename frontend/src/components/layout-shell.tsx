@@ -2,7 +2,7 @@ import { ReactNode, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTodos } from "@/hooks/use-todos";
 import { Link } from "wouter";
-import { LogOut, LayoutDashboard, CheckCircle2, Crown, Zap, Check, X, Loader2, AlertTriangle, RefreshCw, Star, Heart } from "lucide-react";
+import { LogOut, LayoutDashboard, CheckCircle2, Crown, Zap, Check, X, Loader2, AlertTriangle, RefreshCw, Star, Heart, Menu } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -321,98 +321,137 @@ export function LayoutShell({ children }: LayoutShellProps) {
   const { user, logoutMutation } = useAuth();
   const { todos } = useTodos();
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [location] = useLocation();
 
   const taskCount = todos.length;
   const isPro = user?.plan === "PRO";
 
+  const navItems = (
+    <nav className="flex-1 space-y-2">
+      <Link href="/" onClick={() => setMenuOpen(false)}>
+        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors ${
+          location === "/"
+            ? "bg-primary/10 text-primary"
+            : "text-muted-foreground hover:bg-white/5 hover:text-white"
+        }`}>
+          <LayoutDashboard className="h-5 w-5" />
+          <span>Dashboard</span>
+        </div>
+      </Link>
+
+      <Link href="/keepers" onClick={() => setMenuOpen(false)}>
+        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors ${
+          location === "/keepers"
+            ? "bg-amber-500/10 text-amber-400"
+            : "text-muted-foreground hover:bg-white/5 hover:text-white"
+        }`}>
+          <Heart className={`h-5 w-5 ${location === "/keepers" ? "fill-amber-400/20" : ""}`} />
+          <span>Keepers</span>
+        </div>
+      </Link>
+    </nav>
+  );
+
+  const accountSection = (
+    <div className="mt-auto pt-6 border-t border-white/5">
+      <div className="flex items-center gap-3 mb-4 px-2">
+        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/40 to-purple-600/40 border border-white/10 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
+          {(user?.nickname ?? user?.email)?.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-white truncate" data-testid="text-user-nickname">
+            {user?.nickname ?? user?.email?.split("@")[0]}
+          </p>
+          <p className="text-xs text-muted-foreground/60 truncate" data-testid="text-user-email">
+            {user?.email}
+          </p>
+          <div className="flex items-center gap-1 mt-0.5">
+            <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+            <span className="text-xs text-yellow-400 font-medium" data-testid="text-user-score">{user?.score ?? 0}점</span>
+          </div>
+        </div>
+      </div>
+
+      <Button
+        variant="ghost"
+        className="w-full justify-start text-muted-foreground mb-1"
+        onClick={() => setPlanDialogOpen(true)}
+        data-testid="button-plan-indicator"
+      >
+        {isPro ? (
+          <>
+            <Crown className="mr-2 h-4 w-4 text-yellow-400" />
+            <span>Pro 플랜</span>
+            <Badge variant="outline" className="ml-auto text-xs border-yellow-500/30 text-yellow-400 bg-yellow-500/10" data-testid="badge-plan-pro">
+              PRO
+            </Badge>
+          </>
+        ) : (
+          <>
+            <Zap className="mr-2 h-4 w-4 text-primary" />
+            <span>Free 플랜</span>
+            <Badge variant="outline" className="ml-auto text-xs border-primary/30 text-primary bg-primary/10" data-testid="badge-task-count">
+              {taskCount}/{FREE_TASK_LIMIT}
+            </Badge>
+          </>
+        )}
+      </Button>
+
+      <Button
+        variant="ghost"
+        className="w-full justify-start text-muted-foreground"
+        onClick={() => logoutMutation.mutate()}
+        data-testid="button-logout"
+      >
+        <LogOut className="mr-2 h-4 w-4" />
+        Logout
+      </Button>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      <aside className="w-full md:w-64 bg-card border-b md:border-b-0 md:border-r border-white/5 p-6 flex flex-col sticky top-0 md:h-screen z-10">
-        <div className="flex items-center gap-3 mb-10">
+      {/* Mobile drawer */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <div className="w-[70%] h-full bg-card flex flex-col p-6 overflow-y-auto">
+            <div className="flex items-center justify-between mb-10">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20">
+                  <CheckCircle2 className="h-6 w-6 text-white" />
+                </div>
+                <h1 className="text-xl font-bold font-display tracking-tight text-white">TaskFlow</h1>
+              </div>
+              <button onClick={() => setMenuOpen(false)}>
+                <X className="h-6 w-6 text-muted-foreground" />
+              </button>
+            </div>
+            {navItems}
+            {accountSection}
+          </div>
+          <div
+            className="flex-1 bg-black/50 backdrop-blur-sm"
+            onClick={() => setMenuOpen(false)}
+          />
+        </div>
+      )}
+
+      {/* Sidebar - desktop full / mobile top bar */}
+      <aside className="w-full md:w-64 bg-card border-b md:border-b-0 md:border-r border-white/5 md:p-6 px-4 py-3 flex flex-col sticky top-0 md:h-screen z-10">
+        <div className="flex items-center gap-3 md:mb-10">
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20">
             <CheckCircle2 className="h-6 w-6 text-white" />
           </div>
           <h1 className="text-xl font-bold font-display tracking-tight text-white">TaskFlow</h1>
+          <button className="ml-auto md:hidden" onClick={() => setMenuOpen(true)}>
+            <Menu className="h-6 w-6 text-muted-foreground" />
+          </button>
         </div>
 
-        <nav className="flex-1 space-y-2">
-          <Link href="/">
-            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors ${
-              location === "/"
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-white/5 hover:text-white"
-            }`}>
-              <LayoutDashboard className="h-5 w-5" />
-              <span>Dashboard</span>
-            </div>
-          </Link>
-
-          <Link href="/keepers">
-            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors ${
-              location === "/keepers"
-                ? "bg-amber-500/10 text-amber-400"
-                : "text-muted-foreground hover:bg-white/5 hover:text-white"
-            }`}>
-              <Heart className={`h-5 w-5 ${location === "/keepers" ? "fill-amber-400/20" : ""}`} />
-              <span>Keepers</span>
-            </div>
-          </Link>
-        </nav>
-
-        <div className="mt-auto pt-6 border-t border-white/5">
-          <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/40 to-purple-600/40 border border-white/10 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
-              {(user?.nickname ?? user?.email)?.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate" data-testid="text-user-nickname">
-                {user?.nickname ?? user?.email?.split("@")[0]}
-              </p>
-              <p className="text-xs text-muted-foreground/60 truncate" data-testid="text-user-email">
-                {user?.email}
-              </p>
-              <div className="flex items-center gap-1 mt-0.5">
-                <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
-                <span className="text-xs text-yellow-400 font-medium" data-testid="text-user-score">{user?.score ?? 0}점</span>
-              </div>
-            </div>
-          </div>
-
-          <Button
-            variant="ghost"
-            className="w-full justify-start text-muted-foreground mb-1"
-            onClick={() => setPlanDialogOpen(true)}
-            data-testid="button-plan-indicator"
-          >
-            {isPro ? (
-              <>
-                <Crown className="mr-2 h-4 w-4 text-yellow-400" />
-                <span>Pro 플랜</span>
-                <Badge variant="outline" className="ml-auto text-xs border-yellow-500/30 text-yellow-400 bg-yellow-500/10" data-testid="badge-plan-pro">
-                  PRO
-                </Badge>
-              </>
-            ) : (
-              <>
-                <Zap className="mr-2 h-4 w-4 text-primary" />
-                <span>Free 플랜</span>
-                <Badge variant="outline" className="ml-auto text-xs border-primary/30 text-primary bg-primary/10" data-testid="badge-task-count">
-                  {taskCount}/{FREE_TASK_LIMIT}
-                </Badge>
-              </>
-            )}
-          </Button>
-
-          <Button
-            variant="ghost"
-            className="w-full justify-start text-muted-foreground"
-            onClick={() => logoutMutation.mutate()}
-            data-testid="button-logout"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+        <div className="hidden md:flex md:flex-col md:flex-1">
+          {navItems}
+          {accountSection}
         </div>
       </aside>
 
