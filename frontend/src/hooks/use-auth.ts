@@ -3,7 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth as useAuthContext } from "@/contexts/AuthContext";
 
 export function useAuth() {
-  const { user, isLoading, login, register, logout } = useAuthContext();
+  const { user, isLoading, login, register, logout, refreshUser } = useAuthContext();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -37,5 +37,5 @@ export function useAuth() {
     },
   });
 
-  return { user, isLoading, loginMutation, registerMutation, logoutMutation };
+  return { user, isLoading, loginMutation, registerMutation, logoutMutation, refreshUser };
 }

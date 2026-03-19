@@ -1,5 +1,6 @@
 package com.todo.controller;
 
+import com.todo.dto.BatchCompleteRequest;
 import com.todo.dto.TodoRequest;
 import com.todo.dto.TodoUpdateRequest;
 import com.todo.dto.TodoUpdateResponse;
@@ -48,6 +49,13 @@ public class TodoController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", e.getMessage()));
         }
+    }
+
+    @PatchMapping("/batch-complete")
+    public ResponseEntity<Map<String, Integer>> batchComplete(@AuthenticationPrincipal User user,
+                                                              @RequestBody BatchCompleteRequest request) {
+        int totalPoints = todoService.batchComplete(user.getId(), request);
+        return ResponseEntity.ok(Map.of("totalPointsEarned", totalPoints));
     }
 
     @DeleteMapping("/{id}")

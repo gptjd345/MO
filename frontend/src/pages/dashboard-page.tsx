@@ -203,7 +203,7 @@ function DateRangePicker({
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { todos, isLoading, createTodo, updateTodo, deleteTodo, isCreating, isUpdating } = useTodos();
+  const { todos, isLoading, createTodo, updateTodo, batchComplete, deleteTodo, isCreating, isUpdating } = useTodos();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [createDateRange, setCreateDateRange] = useState<DateRange | undefined>();
@@ -276,12 +276,11 @@ export default function DashboardPage() {
   };
 
   const handleCompleteSelected = () => {
-    selectedIds.forEach(id => {
+    const ids = Array.from(selectedIds).filter(id => {
       const todo = todos.find(t => t.id === id);
-      if (todo && !todo.completed) {
-        updateTodo({ id, completed: true });
-      }
+      return todo && !todo.completed;
     });
+    if (ids.length > 0) batchComplete(ids);
     setSelectedIds(new Set());
   };
 

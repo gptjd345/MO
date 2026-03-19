@@ -50,6 +50,7 @@ function PlanDialog({ open, onOpenChange, taskCount, isPro }: {
   isPro: boolean;
 }) {
   const { toast } = useToast();
+  const { refreshUser } = useAuth();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<PaymentStep>("plan");
   const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
@@ -92,7 +93,7 @@ function PlanDialog({ open, onOpenChange, taskCount, isPro }: {
 
       if (result.status === "SUCCESS") {
         setStep("success");
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        await refreshUser();
         toast({ title: "결제 완료!", description: "Pro 플랜이 활성화되었습니다." });
       } else {
         setStep("fail");

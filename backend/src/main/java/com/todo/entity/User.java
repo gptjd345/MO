@@ -28,6 +28,9 @@ public class User {
     @Column(name = "token_version", nullable = false)
     private int tokenVersion = 0;
 
+    @Column(name = "ranking_version", nullable = false)
+    private int rankingVersion = 0;
+
     public User() {}
 
     public User(String email, String password) {
@@ -49,4 +52,6 @@ public class User {
     public void setNickname(String nickname) { this.nickname = nickname; }
     public int getTokenVersion() { return tokenVersion; }
     public void setTokenVersion(int tokenVersion) { this.tokenVersion = tokenVersion; }
+    public int getRankingVersion() { return rankingVersion; }
+    public void setRankingVersion(int rankingVersion) { this.rankingVersion = rankingVersion; }
 }

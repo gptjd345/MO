@@ -95,6 +95,31 @@ export function useTodos() {
     },
   });
 
+  const batchCompleteMutation = useMutation({
+    mutationFn: async (ids: number[]): Promise<{ totalPointsEarned: number }> => {
+      const res = await fetchWithRefresh("/api/todos/batch-complete", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) throw new Error("Failed to complete tasks");
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      if (data.totalPointsEarned > 0) {
+        addScore(data.totalPointsEarned);
+        toast({
+          title: `+${data.totalPointsEarned}점 획득!`,
+          description: "선택한 일정을 모두 완료했어요.",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const deleteTodoMutation = useMutation({
     mutationFn: async (id: number) => {
       const res = await fetchWithRefresh(`/api/todos/${id}`, { method: "DELETE" });
@@ -117,6 +142,7 @@ export function useTodos() {
     isCreating: createTodoMutation.isPending,
     updateTodo: updateTodoMutation.mutate,
     isUpdating: updateTodoMutation.isPending,
+    batchComplete: batchCompleteMutation.mutate,
     deleteTodo: deleteTodoMutation.mutate,
   };
 }

@@ -1,26 +1,18 @@
 import { useMemo } from "react";
 import { LayoutShell } from "@/components/layout-shell";
 import { useAuth } from "@/hooks/use-auth";
+import { useRanking, RankingEntry } from "@/hooks/use-ranking";
 import { motion } from "framer-motion";
 import { Star, Heart } from "lucide-react";
 
-interface KeeperEntry {
-  id: number;
-  initial: string;
-  score: number;
-  completionRate: number;
-  avatarGradient: string;
-}
-
-const ABOVE_TEMPLATES = [
-  { id: 1, initial: "S", completionRate: 94, avatarGradient: "from-violet-500 to-purple-600" },
-  { id: 2, initial: "J", completionRate: 89, avatarGradient: "from-blue-500 to-cyan-600" },
-  { id: 3, initial: "M", completionRate: 83, avatarGradient: "from-teal-500 to-emerald-600" },
-];
-
-const BELOW_TEMPLATES = [
-  { id: 4, initial: "K", completionRate: 74, avatarGradient: "from-rose-400 to-pink-600" },
-  { id: 5, initial: "A", completionRate: 67, avatarGradient: "from-amber-400 to-orange-500" },
+const GRADIENTS = [
+  "from-violet-500 to-purple-600",
+  "from-blue-500 to-cyan-600",
+  "from-teal-500 to-emerald-600",
+  "from-rose-400 to-pink-600",
+  "from-amber-400 to-orange-500",
+  "from-indigo-500 to-blue-600",
+  "from-pink-500 to-rose-600",
 ];
 
 const container = {
@@ -35,27 +27,22 @@ const item = {
 
 export default function KeepersPage() {
   const { user } = useAuth();
-  const userScore = user?.score ?? 0;
+  const { data, isLoading } = useRanking();
 
-  const above: KeeperEntry[] = useMemo(
-    () =>
-      ABOVE_TEMPLATES.map((t, i) => ({
-        ...t,
-        score: userScore + (3 - i) * 12,
-      })),
-    [userScore]
+  const rankings = data?.rankings ?? [];
+
+  const meIndex = rankings.findIndex((r) => r.isMe);
+  const above = meIndex > -1 ? rankings.slice(0, meIndex) : [];
+  const me = meIndex > -1 ? rankings[meIndex] : null;
+  const below = meIndex > -1 ? rankings.slice(meIndex + 1) : [];
+
+  const maxScore = useMemo(
+    () => Math.max(...rankings.map((r) => r.score), 1),
+    [rankings]
   );
 
-  const below: KeeperEntry[] = useMemo(
-    () =>
-      BELOW_TEMPLATES.map((t, i) => ({
-        ...t,
-        score: Math.max(0, userScore - (i + 1) * 12),
-      })),
-    [userScore]
-  );
-
-  const userCompletionRate = 80; // Redis 연동 후 실 데이터로 교체
+  const scoreBar = (score: number) =>
+    Math.max(Math.round((score / maxScore) * 100), 4);
 
   return (
     <LayoutShell>
@@ -93,49 +80,67 @@ export default function KeepersPage() {
           </p>
         </motion.div>
 
+        {/* Empty state */}
+        {!isLoading && rankings.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-16 text-muted-foreground text-sm"
+          >
+            <Heart className="h-8 w-8 mx-auto mb-3 text-amber-400/30" />
+            <p>일정을 완료하면 랭킹에 등록돼요</p>
+          </motion.div>
+        )}
+
         {/* List */}
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-2.5"
-        >
-          {/* Above */}
-          {above.map((keeper) => (
-            <motion.div key={keeper.id} variants={item}>
-              <KeeperCard keeper={keeper} />
+        {rankings.length > 0 && (
+          <motion.div
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="space-y-2.5"
+          >
+            {/* Above */}
+            {above.map((entry) => (
+              <motion.div key={entry.userId} variants={item}>
+                <KeeperCard entry={entry} scoreBar={scoreBar(entry.score)} />
+              </motion.div>
+            ))}
+
+            {/* "나" divider */}
+            <motion.div variants={item} className="relative py-2">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-amber-500/15" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-background px-3 text-[11px] text-amber-400/60 tracking-wide">
+                  지금 나의 자리
+                </span>
+              </div>
             </motion.div>
-          ))}
 
-          {/* "나" divider */}
-          <motion.div variants={item} className="relative py-2">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-amber-500/15" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-background px-3 text-[11px] text-amber-400/60 tracking-wide">
-                지금 나의 자리
-              </span>
-            </div>
+            {/* Current user */}
+            {me && (
+              <motion.div variants={item}>
+                <CurrentUserCard user={user} scoreBar={scoreBar(me.score)} />
+              </motion.div>
+            )}
+
+            {/* Subtle divider */}
+            {below.length > 0 && (
+              <motion.div variants={item} className="py-1">
+                <div className="w-full border-t border-white/5" />
+              </motion.div>
+            )}
+
+            {/* Below */}
+            {below.map((entry) => (
+              <motion.div key={entry.userId} variants={item}>
+                <KeeperCard entry={entry} scoreBar={scoreBar(entry.score)} />
+              </motion.div>
+            ))}
           </motion.div>
-
-          {/* Current user */}
-          <motion.div variants={item}>
-            <CurrentUserCard user={user} completionRate={userCompletionRate} />
-          </motion.div>
-
-          {/* Subtle divider */}
-          <motion.div variants={item} className="py-1">
-            <div className="w-full border-t border-white/5" />
-          </motion.div>
-
-          {/* Below */}
-          {below.map((keeper) => (
-            <motion.div key={keeper.id} variants={item}>
-              <KeeperCard keeper={keeper} />
-            </motion.div>
-          ))}
-        </motion.div>
+        )}
 
         {/* Footer */}
         <motion.p
@@ -151,24 +156,27 @@ export default function KeepersPage() {
   );
 }
 
-function KeeperCard({ keeper }: { keeper: KeeperEntry }) {
+function KeeperCard({ entry, scoreBar }: { entry: RankingEntry; scoreBar: number }) {
+  const initial = entry.nickname.charAt(0).toUpperCase();
+  const gradient = GRADIENTS[entry.userId % GRADIENTS.length];
+
   return (
     <div className="flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-white/[0.07] bg-card/50 backdrop-blur-sm transition-colors duration-200 hover:border-white/[0.12] hover:bg-card/70">
       <div
-        className={`h-10 w-10 rounded-full bg-gradient-to-br ${keeper.avatarGradient} flex items-center justify-center flex-shrink-0 opacity-75`}
+        className={`h-10 w-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center flex-shrink-0 opacity-75`}
       >
-        <span className="text-sm font-bold text-white">{keeper.initial}</span>
+        <span className="text-sm font-bold text-white">{initial}</span>
       </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-sm text-white/65 font-medium">
-            {keeper.initial}***
+            {entry.nickname}
           </span>
           <div className="flex items-center gap-1">
             <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
             <span className="text-xs text-yellow-400/75 font-medium">
-              {keeper.score}점
+              {entry.score}점
             </span>
           </div>
         </div>
@@ -177,16 +185,10 @@ function KeeperCard({ keeper }: { keeper: KeeperEntry }) {
           <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-r from-primary/45 to-purple-400/45"
-              style={{ width: `${keeper.completionRate}%` }}
+              style={{ width: `${scoreBar}%` }}
             />
           </div>
-          <span className="text-[11px] text-muted-foreground/50 flex-shrink-0 w-7 text-right">
-            {keeper.completionRate}%
-          </span>
         </div>
-        <p className="text-[10px] text-muted-foreground/30 mt-0.5">
-          약속 이행률
-        </p>
       </div>
     </div>
   );
@@ -194,25 +196,22 @@ function KeeperCard({ keeper }: { keeper: KeeperEntry }) {
 
 function CurrentUserCard({
   user,
-  completionRate,
+  scoreBar,
 }: {
   user: { email: string; nickname: string; score: number; plan: string } | null;
-  completionRate: number;
+  scoreBar: number;
 }) {
   const displayName = user?.nickname ?? user?.email?.split("@")[0] ?? "나";
   const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <div className="relative flex items-center gap-4 px-5 py-4 rounded-2xl border border-amber-500/25 bg-amber-500/[0.04]">
-      {/* Subtle inner glow */}
       <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-amber-500/[0.04] via-transparent to-rose-500/[0.04] pointer-events-none" />
 
-      {/* "나" badge */}
       <span className="absolute -top-[11px] left-4 text-[11px] px-2.5 py-[3px] rounded-full bg-amber-500/15 border border-amber-500/25 text-amber-400 font-medium tracking-wide">
         나
       </span>
 
-      {/* Avatar */}
       <div className="relative flex-shrink-0">
         <div className="h-12 w-12 rounded-full bg-gradient-to-br from-amber-500/30 to-rose-500/25 border border-amber-500/30 flex items-center justify-center">
           <span className="text-base font-bold text-amber-200">{initial}</span>
@@ -220,7 +219,6 @@ function CurrentUserCard({
         <div className="absolute inset-[-3px] rounded-full ring-1 ring-amber-500/15 pointer-events-none" />
       </div>
 
-      {/* Info */}
       <div className="flex-1 min-w-0 relative">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-semibold text-white/90">{displayName}</span>
@@ -236,14 +234,10 @@ function CurrentUserCard({
           <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-r from-amber-400 to-rose-400"
-              style={{ width: `${completionRate}%` }}
+              style={{ width: `${scoreBar}%` }}
             />
           </div>
-          <span className="text-xs text-amber-400/65 flex-shrink-0 w-7 text-right">
-            {completionRate}%
-          </span>
         </div>
-        <p className="text-[10px] text-amber-400/35 mt-1">약속 이행률</p>
       </div>
     </div>
   );
