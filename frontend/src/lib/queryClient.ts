@@ -14,7 +14,7 @@ export function removeToken() {
   localStorage.removeItem("access_token");
 }
 
-function authHeaders(extra?: Record<string, string>): Record<string, string> {
+export function authHeaders(extra?: Record<string, string>): Record<string, string> {
   const headers: Record<string, string> = { ...extra };
   const token = getToken();
   if (token) {

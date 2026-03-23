@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { getToken, tryRefresh } from "@/lib/queryClient";
+import { authHeaders, tryRefresh } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface TodoUpdateResponse {
@@ -19,12 +19,6 @@ export interface Todo {
   userId: number;
 }
 
-function authHeaders(extra?: Record<string, string>): Record<string, string> {
-  const headers: Record<string, string> = { ...extra };
-  const token = getToken();
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return headers;
-}
 
 async function fetchWithRefresh(url: string, init: RequestInit = {}): Promise<Response> {
   let res = await fetch(url, { ...init, headers: authHeaders(init.headers as Record<string, string>) });
