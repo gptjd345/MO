@@ -5,6 +5,8 @@ import com.todo.dto.RegisterRequest;
 import com.todo.dto.TokenPair;
 import com.todo.entity.RefreshToken;
 import com.todo.entity.User;
+import com.todo.exception.CustomException;
+import com.todo.exception.ErrorCode;
 import com.todo.repository.RefreshTokenRepository;
 import com.todo.repository.UserRepository;
 import io.jsonwebtoken.Claims;
@@ -37,7 +39,7 @@ public class AuthService {
     @Transactional
     public TokenPair register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already registered");
+            throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
         User user = new User();
@@ -52,10 +54,10 @@ public class AuthService {
     @Transactional
     public TokenPair login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_CREDENTIALS));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Invalid email or password");
+            throw new CustomException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         return issueTokenPair(user);
@@ -65,17 +67,17 @@ public class AuthService {
     public TokenPair refresh(String refreshToken) {
         Claims claims = jwtService.validateRefreshToken(refreshToken);
         if (claims == null) {
-            throw new RuntimeException("Invalid or expired refresh token");
+            throw new CustomException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
         String jti = claims.getId();
         if (!refreshTokenRepository.existsByJtiAndRevokedAtIsNull(jti)) {
-            throw new RuntimeException("Invalid or expired refresh token");
+            throw new CustomException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
         Long userId = Long.parseLong(claims.getSubject());
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         refreshTokenRepository.revokeByJti(jti, LocalDateTime.now());
         return issueTokenPair(user);

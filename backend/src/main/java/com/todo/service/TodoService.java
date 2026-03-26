@@ -6,6 +6,8 @@ import com.todo.dto.TodoUpdateRequest;
 import com.todo.dto.TodoUpdateResponse;
 import com.todo.entity.Todo;
 import com.todo.entity.User;
+import com.todo.exception.CustomException;
+import com.todo.exception.ErrorCode;
 import com.todo.ranking.infrastructure.RedisStreamConsumer;
 import com.todo.repository.TodoRepository;
 import com.todo.repository.UserRepository;
@@ -58,10 +60,10 @@ public class TodoService {
     @Transactional
     public TodoUpdateResponse updateTodo(Long id, Long userId, TodoUpdateRequest request) {
         Todo todo = todoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Todo not found"));
+                .orElseThrow(() -> new CustomException(ErrorCode.TODO_NOT_FOUND));
 
         if (!todo.getUserId().equals(userId)) {
-            throw new RuntimeException("Unauthorized");
+            throw new CustomException(ErrorCode.FORBIDDEN);
         }
 
         if (request.getTitle() != null) todo.setTitle(request.getTitle());
@@ -86,7 +88,7 @@ public class TodoService {
             if (!wasCompleted && request.getCompleted() && !todo.isScored()) {
                 pointsEarned = calculatePoints(todo);
                 scoredUser = userRepository.findById(userId)
-                        .orElseThrow(() -> new RuntimeException("User not found"));
+                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
                 scoredUser.setScore(scoredUser.getScore() + pointsEarned);
                 scoredUser.setRankingVersion(scoredUser.getRankingVersion() + 1);
                 userRepository.save(scoredUser);
@@ -127,7 +129,7 @@ public class TodoService {
 
         if (totalPoints > 0) {
             User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
             user.setScore(user.getScore() + totalPoints);
             user.setRankingVersion(user.getRankingVersion() + 1);
             userRepository.save(user);
@@ -149,10 +151,10 @@ public class TodoService {
 
     public void deleteTodo(Long id, Long userId) {
         Todo todo = todoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Todo not found"));
+                .orElseThrow(() -> new CustomException(ErrorCode.TODO_NOT_FOUND));
 
         if (!todo.getUserId().equals(userId)) {
-            throw new RuntimeException("Unauthorized");
+            throw new CustomException(ErrorCode.FORBIDDEN);
         }
 
         todoRepository.delete(todo);

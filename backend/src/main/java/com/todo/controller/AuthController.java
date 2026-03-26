@@ -2,6 +2,8 @@ package com.todo.controller;
 
 import com.todo.dto.*;
 import com.todo.entity.User;
+import com.todo.exception.CustomException;
+import com.todo.exception.ErrorCode;
 import com.todo.repository.UserRepository;
 import com.todo.service.AuthService;
 import com.todo.service.JwtService;
@@ -35,50 +37,34 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request,
-                                      HttpServletResponse response) {
-        try {
-            TokenPair tokens = authService.register(request);
-            setRefreshCookie(response, tokens.refreshToken());
-            User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new AuthResponse(tokens.accessToken(), user.getId(), user.getEmail(), user.getNickname(), user.getPlan(), user.getScore()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request,
+                                                 HttpServletResponse response) {
+        TokenPair tokens = authService.register(request);
+        setRefreshCookie(response, tokens.refreshToken());
+        User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new AuthResponse(tokens.accessToken(), user.getId(), user.getEmail(), user.getNickname(), user.getPlan(), user.getScore()));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request,
-                                   HttpServletResponse response) {
-        try {
-            TokenPair tokens = authService.login(request);
-            setRefreshCookie(response, tokens.refreshToken());
-            User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
-            return ResponseEntity.ok(
-                    new AuthResponse(tokens.accessToken(), user.getId(), user.getEmail(), user.getNickname(), user.getPlan(), user.getScore()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
+                                              HttpServletResponse response) {
+        TokenPair tokens = authService.login(request);
+        setRefreshCookie(response, tokens.refreshToken());
+        User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
+        return ResponseEntity.ok(
+                new AuthResponse(tokens.accessToken(), user.getId(), user.getEmail(), user.getNickname(), user.getPlan(), user.getScore()));
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(HttpServletRequest request, HttpServletResponse response) {
+    public ResponseEntity<Map<String, String>> refresh(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = extractRefreshCookie(request);
         if (refreshToken == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Refresh token not found"));
+            throw new CustomException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
-        try {
-            TokenPair tokens = authService.refresh(refreshToken);
-            setRefreshCookie(response, tokens.refreshToken());
-            return ResponseEntity.ok(Map.of("accessToken", tokens.accessToken()));
-        } catch (RuntimeException e) {
-            clearRefreshCookie(response);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", e.getMessage()));
-        }
+        TokenPair tokens = authService.refresh(refreshToken);
+        setRefreshCookie(response, tokens.refreshToken());
+        return ResponseEntity.ok(Map.of("accessToken", tokens.accessToken()));
     }
 
     @PostMapping("/logout")

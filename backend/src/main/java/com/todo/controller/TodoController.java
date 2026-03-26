@@ -39,16 +39,10 @@ public class TodoController {
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<?> update(@AuthenticationPrincipal User user,
-                                    @PathVariable Long id,
-                                    @RequestBody TodoUpdateRequest request) {
-        try {
-            TodoUpdateResponse response = todoService.updateTodo(id, user.getId(), request);
-            return ResponseEntity.ok(response);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<TodoUpdateResponse> update(@AuthenticationPrincipal User user,
+                                                     @PathVariable Long id,
+                                                     @RequestBody TodoUpdateRequest request) {
+        return ResponseEntity.ok(todoService.updateTodo(id, user.getId(), request));
     }
 
     @PatchMapping("/batch-complete")
@@ -59,14 +53,9 @@ public class TodoController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@AuthenticationPrincipal User user,
-                                    @PathVariable Long id) {
-        try {
-            todoService.deleteTodo(id, user.getId());
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal User user,
+                                       @PathVariable Long id) {
+        todoService.deleteTodo(id, user.getId());
+        return ResponseEntity.noContent().build();
     }
 }
