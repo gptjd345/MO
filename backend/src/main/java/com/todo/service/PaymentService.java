@@ -8,6 +8,8 @@ import com.todo.payment.domain.PgRequest;
 import com.todo.payment.domain.PgResult;
 import com.todo.payment.domain.PgTimeoutException;
 import com.todo.payment.domain.PgSystemException;
+import com.todo.exception.CustomException;
+import com.todo.exception.ErrorCode;
 import com.todo.repository.PaymentRepository;
 import com.todo.repository.UserRepository;
 import org.slf4j.Logger;
@@ -36,6 +38,22 @@ public class PaymentService {
         this.paymentRepository = paymentRepository;
         this.userRepository = userRepository;
         this.pgClient = pgClient;
+    }
+
+    public void validateNotProPlan(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        if ("PRO".equals(user.getPlan())) {
+            throw new CustomException(ErrorCode.ALREADY_PRO_PLAN);
+        }
+    }
+
+    public void validateProPlan(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        if (!"PRO".equals(user.getPlan())) {
+            throw new CustomException(ErrorCode.NOT_PRO_PLAN);
+        }
     }
 
     @Transactional

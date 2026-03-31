@@ -7,6 +7,10 @@ public enum ErrorCode {
     // Auth : 400
     EMAIL_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "Email already registered"),
 
+    // Payment : 400
+    ALREADY_PRO_PLAN(HttpStatus.BAD_REQUEST, "Already subscribed to Pro plan"),
+    NOT_PRO_PLAN(HttpStatus.FORBIDDEN, "This feature requires a Pro plan"),
+
     // Auth : 401
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid email or password"),
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token"),

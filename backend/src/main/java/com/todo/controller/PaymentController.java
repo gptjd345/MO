@@ -10,7 +10,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -23,27 +22,14 @@ public class PaymentController {
     }
 
     @PostMapping("/subscribe")
-    public ResponseEntity<?> subscribe(@AuthenticationPrincipal User user,
-                                        @Valid @RequestBody PaymentRequest request) {
-        if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
-        }
-
-        if ("PRO".equals(user.getPlan())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Already subscribed to Pro plan"));
-        }
-
-        PaymentResponse response = paymentService.processPayment(user.getId(), request.getIdempotencyKey());
-        return ResponseEntity.ok(response);
+    public ResponseEntity<PaymentResponse> subscribe(@AuthenticationPrincipal User user,
+                                                     @Valid @RequestBody PaymentRequest request) {
+        paymentService.validateNotProPlan(user.getId());
+        return ResponseEntity.ok(paymentService.processPayment(user.getId(), request.getIdempotencyKey()));
     }
 
     @GetMapping("/history")
-    public ResponseEntity<?> history(@AuthenticationPrincipal User user) {
-        if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
-        }
-
-        List<PaymentResponse> history = paymentService.getPaymentHistory(user.getId());
-        return ResponseEntity.ok(history);
+    public ResponseEntity<List<PaymentResponse>> history(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(paymentService.getPaymentHistory(user.getId()));
     }
 }

@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/rankings")
@@ -24,10 +23,7 @@ public class RankingController {
     }
 
     @GetMapping("/around")
-    public ResponseEntity<?> getRankingAround(@AuthenticationPrincipal User user) {
-        if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
-        }
+    public ResponseEntity<RankingResponse> getRankingAround(@AuthenticationPrincipal User user) {
         List<Ranking> rankings = rankingService.getRankingAround(user.getId());
         return ResponseEntity.ok(new RankingResponse(rankings));
     }
