@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import { useTodos, type Todo } from "@/hooks/use-todos";
 import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
@@ -662,19 +662,15 @@ export default function DashboardPage() {
   );
 }
 
-function TodoCard({
-  todo,
-  selected,
-  onSelect,
-  onEdit,
-}: {
+const TodoCard = forwardRef<HTMLDivElement, {
   todo: Todo;
   selected: boolean;
   onSelect: (id: number) => void;
   onEdit: (todo: Todo) => void;
-}) {
+}>(function TodoCard({ todo, selected, onSelect, onEdit }, ref) {
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -728,4 +724,4 @@ function TodoCard({
       </Card>
     </motion.div>
   );
-}
+});

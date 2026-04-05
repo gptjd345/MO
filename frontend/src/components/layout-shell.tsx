@@ -2,7 +2,7 @@ import { ReactNode, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTodos } from "@/hooks/use-todos";
 import { Link } from "wouter";
-import { LogOut, LayoutDashboard, CheckCircle2, Crown, Zap, Check, X, Loader2, AlertTriangle, RefreshCw, Star, Heart, Menu } from "lucide-react";
+import { LogOut, LayoutDashboard, CheckCircle2, Crown, Zap, Check, X, Loader2, AlertTriangle, RefreshCw, Star, Heart, Menu, CalendarDays } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -349,6 +349,17 @@ export function LayoutShell({ children }: LayoutShellProps) {
         }`}>
           <Heart className={`h-5 w-5 ${location === "/keepers" ? "fill-amber-400/20" : ""}`} />
           <span>Keepers</span>
+        </div>
+      </Link>
+
+      <Link href="/calendar" onClick={() => setMenuOpen(false)}>
+        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors ${
+          location === "/calendar"
+            ? "bg-emerald-500/10 text-emerald-400"
+            : "text-muted-foreground hover:bg-white/5 hover:text-white"
+        }`}>
+          <CalendarDays className="h-5 w-5" />
+          <span>Journey</span>
         </div>
       </Link>
     </nav>

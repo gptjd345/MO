@@ -22,7 +22,10 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
 
     // Todo : 404
-    TODO_NOT_FOUND(HttpStatus.NOT_FOUND, "Todo not found");
+    TODO_NOT_FOUND(HttpStatus.NOT_FOUND, "Todo not found"),
+
+    // Stats : 400
+    GOAL_SETTING_LOCKED(HttpStatus.BAD_REQUEST, "Goal can only be set on Monday of target week or Sunday before next week");
 
     private final HttpStatus status;
     private final String defaultMessage;

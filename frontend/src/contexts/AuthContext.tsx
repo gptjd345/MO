@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { setToken, removeToken, tryRefresh, getToken } from "@/lib/queryClient";
 
 interface User {
@@ -43,6 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 마운트 시 localStorage에서 바로 읽기 — API 호출 없음
   const [user, setUser] = useState<User | null>(loadUser);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const handle = () => setUser(null);
+    window.addEventListener("auth:logout", handle);
+    return () => window.removeEventListener("auth:logout", handle);
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);

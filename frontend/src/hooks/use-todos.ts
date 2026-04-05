@@ -76,6 +76,10 @@ export function useTodos() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      // stats worker가 처리할 시간을 주고 invalidate
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["stats"] });
+      }, 800);
       if (data.pointsEarned > 0) {
         addScore(data.pointsEarned);
         toast({
@@ -101,6 +105,9 @@ export function useTodos() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["stats"] });
+      }, 800);
       if (data.totalPointsEarned > 0) {
         addScore(data.totalPointsEarned);
         toast({

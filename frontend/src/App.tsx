@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import AuthPage from "@/pages/auth-page";
 import DashboardPage from "@/pages/dashboard-page";
 import KeepersPage from "@/pages/keepers-page";
+import CalendarPage from "@/pages/calendar-page";
 import NotFound from "@/pages/not-found";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -39,6 +40,9 @@ function Router() {
       </Route>
       <Route path="/keepers">
         <ProtectedRoute component={KeepersPage} />
+      </Route>
+      <Route path="/calendar">
+        <ProtectedRoute component={CalendarPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

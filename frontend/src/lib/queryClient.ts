@@ -39,6 +39,8 @@ export async function tryRefresh(): Promise<boolean> {
     return true;
   }
   removeToken();
+  localStorage.removeItem("user_data");
+  window.dispatchEvent(new Event("auth:logout"));
   return false;
 }
 
