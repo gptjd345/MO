@@ -35,6 +35,9 @@ public class Todo {
     @Column(nullable = false)
     private boolean scored;
 
+    @Column(name = "completed_at")
+    private LocalDate completedAt;
+
     public Todo() {}
 
     public Long getId() { return id; }
@@ -55,4 +58,6 @@ public class Todo {
     public void setUserId(Long userId) { this.userId = userId; }
     public boolean isScored() { return scored; }
     public void setScored(boolean scored) { this.scored = scored; }
+    public LocalDate getCompletedAt() { return completedAt; }
+    public void setCompletedAt(LocalDate completedAt) { this.completedAt = completedAt; }
 }

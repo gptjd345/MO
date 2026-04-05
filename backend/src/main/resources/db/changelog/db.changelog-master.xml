@@ -10,5 +10,7 @@
     <include file="sql/V3__refactor_app_users_to_users.sql" relativeToChangelogFile="true"/>
     <include file="sql/V4__add_token_version_and_refresh_tokens.sql" relativeToChangelogFile="true"/>
     <include file="sql/V5__add_ranking_version_to_users.sql" relativeToChangelogFile="true"/>
+    <include file="sql/V6__add_completed_at_to_todos.sql" relativeToChangelogFile="true"/>
+    <include file="sql/V7__add_stats_tables.sql" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>
