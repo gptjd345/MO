@@ -1,5 +1,6 @@
-import { useState, forwardRef } from "react";
-import { useTodos, type Todo } from "@/hooks/use-todos";
+import { useState, forwardRef, useEffect } from "react";
+import { useSearch } from "wouter";
+import { useActiveTodos, useCompletedTodos, useTodoMutations, type Todo, type SortOption } from "@/hooks/use-todos";
 import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,7 +23,7 @@ import {
   DialogFooter,
   DialogDescription
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Pencil, Calendar as CalendarIcon, Loader2, Star, ArrowRight, CheckCircle2, ArrowUpDown, Search, X, Zap } from "lucide-react";
+import { Plus, Trash2, Pencil, Calendar as CalendarIcon, Loader2, Star, ArrowRight, CheckCircle2, ArrowUpDown, Search, X, Zap, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { FREE_TASK_LIMIT } from "@/components/layout-shell";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
@@ -38,8 +39,6 @@ const editTodoSchema = z.object({
   content: z.string().optional(),
 });
 
-type SortOption = "newest" | "oldest" | "name" | "deadline" | "priority";
-
 const sortLabels: Record<SortOption, string> = {
   newest: "Latest",
   oldest: "Oldest",
@@ -48,37 +47,6 @@ const sortLabels: Record<SortOption, string> = {
   priority: "Priority",
 };
 
-const priorityOrder: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
-
-function sortTodos(list: Todo[], sort: SortOption): Todo[] {
-  return [...list].sort((a, b) => {
-    switch (sort) {
-      case "newest":
-        return b.id - a.id;
-      case "oldest":
-        return a.id - b.id;
-      case "name":
-        return a.title.localeCompare(b.title);
-      case "deadline": {
-        const ae = a.endDate ?? "";
-        const be = b.endDate ?? "";
-        if (!ae && !be) return 0;
-        if (!ae) return 1;
-        if (!be) return -1;
-        const now = new Date();
-        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-        const aOverdue = ae < today;
-        const bOverdue = be < today;
-        if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
-        return ae < be ? -1 : ae > be ? 1 : 0;
-      }
-      case "priority":
-        return (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1);
-      default:
-        return 0;
-    }
-  });
-}
 
 const priorityConfig = {
   HIGH: { label: "High", stars: 3, color: "text-red-400", bgClass: "bg-red-500/10 text-red-400 border-red-500/20" },
@@ -203,17 +171,31 @@ function DateRangePicker({
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { todos, isLoading, createTodo, updateTodo, batchComplete, deleteTodo, isCreating, isUpdating } = useTodos();
+  const { createTodo, updateTodo, batchComplete, batchUndo, deleteTodo, isCreating, isUpdating } = useTodoMutations();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [createDateRange, setCreateDateRange] = useState<DateRange | undefined>();
   const [createPriority, setCreatePriority] = useState<string>("MEDIUM");
   const [editDateRange, setEditDateRange] = useState<DateRange | undefined>();
   const [editPriority, setEditPriority] = useState<string>("MEDIUM");
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedActiveIds, setSelectedActiveIds] = useState<Set<number>>(new Set());
+  const [selectedCompletedIds, setSelectedCompletedIds] = useState<Set<number>>(new Set());
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [activePage, setActivePage] = useState(0);
+  const [completedPage, setCompletedPage] = useState(0);
+  const [highlightDate, setHighlightDate] = useState<string | null>(null);
+
+  const search = useSearch();
+  const completedDateParam = new URLSearchParams(search).get("completedDate");
+
+  const { data: activeData, isLoading: isActiveLoading } = useActiveTodos(activePage, sortBy, searchQuery);
+  const { data: completedData, isLoading: isCompletedLoading } = useCompletedTodos(completedPage, sortBy, searchQuery);
+
+  const incompleteTodos = activeData?.content ?? [];
+  const completedTodos = completedData?.content ?? [];
+  const isLoading = isActiveLoading && isCompletedLoading;
 
   const createForm = useForm<z.infer<typeof createTodoSchema>>({
     resolver: zodResolver(createTodoSchema),
@@ -266,57 +248,45 @@ export default function DashboardPage() {
     });
   };
 
-  const toggleSelect = (id: number) => {
-    setSelectedIds(prev => {
+  const toggleActiveSelect = (id: number) => {
+    setSelectedCompletedIds(new Set());
+    setSelectedActiveIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleCompletedSelect = (id: number) => {
+    setSelectedActiveIds(new Set());
+    setSelectedCompletedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   };
 
   const handleCompleteSelected = () => {
-    const ids = Array.from(selectedIds).filter(id => {
-      const todo = todos.find(t => t.id === id);
-      return todo && !todo.completed;
-    });
+    const ids = Array.from(selectedActiveIds);
     if (ids.length > 0) batchComplete(ids);
-    setSelectedIds(new Set());
+    setSelectedActiveIds(new Set());
   };
 
-  const handleUncompleteSelected = () => {
-    selectedIds.forEach(id => {
-      const todo = todos.find(t => t.id === id);
-      if (todo && todo.completed) {
-        updateTodo({ id, completed: false });
-      }
-    });
-    setSelectedIds(new Set());
+  const handleUndoSelected = () => {
+    const ids = Array.from(selectedCompletedIds);
+    if (ids.length > 0) batchUndo(ids);
+    setSelectedCompletedIds(new Set());
   };
 
-  const handleDeleteSelected = () => {
-    selectedIds.forEach(id => deleteTodo(id));
-    setSelectedIds(new Set());
-  };
-
-  const filterBySearch = (list: Todo[]) => {
-    if (!searchQuery) return list;
-    const q = searchQuery.toLowerCase();
-    return list.filter(t =>
-      t.title.toLowerCase().includes(q) ||
-      (t.content && t.content.toLowerCase().includes(q))
-    );
-  };
+  useEffect(() => {
+    if (!completedDateParam) return;
+    setHighlightDate(completedDateParam);
+    setCompletedPage(0);
+  }, [completedDateParam]);
 
   const isPro = user?.plan === "PRO";
-  const isAtTaskLimit = !isPro && todos.length >= FREE_TASK_LIMIT;
-
-  const incompleteTodos = sortTodos(filterBySearch(todos.filter(t => !t.completed)), sortBy);
-  const completedTodos = sortTodos(filterBySearch(todos.filter(t => t.completed)), sortBy);
-
-  const selectedActiveCount = incompleteTodos.filter(t => selectedIds.has(t.id)).length;
-  const selectedCompletedCount = completedTodos.filter(t => selectedIds.has(t.id)).length;
-  const totalSelected = selectedIds.size;
+  const totalTodos = (activeData?.totalCount ?? 0) + (completedData?.totalCount ?? 0);
+  const isAtTaskLimit = !isPro && totalTodos >= FREE_TASK_LIMIT;
 
   return (
     <LayoutShell>
@@ -334,14 +304,14 @@ export default function DashboardPage() {
             <Input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") setSearchQuery(searchInput); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { setSearchQuery(searchInput); setActivePage(0); setCompletedPage(0); } }}
               placeholder="Search..."
               className="pl-8 pr-8 w-[160px] bg-background/50 border-white/10"
               data-testid="input-search"
             />
             {searchInput && (
               <button
-                onClick={() => { setSearchInput(""); setSearchQuery(""); }}
+                onClick={() => { setSearchInput(""); setSearchQuery(""); setActivePage(0); setCompletedPage(0); }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
                 data-testid="button-clear-search"
               >
@@ -349,7 +319,7 @@ export default function DashboardPage() {
               </button>
             )}
           </div>
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+          <Select value={sortBy} onValueChange={(v) => { setSortBy(v as SortOption); setActivePage(0); setCompletedPage(0); }}>
             <SelectTrigger className="w-[140px] bg-background/50 border-white/10" data-testid="select-sort">
               <ArrowUpDown className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
               <SelectValue />
@@ -529,7 +499,7 @@ export default function DashboardPage() {
           <Zap className="h-5 w-5 text-yellow-400 shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-medium text-yellow-400">무료 플랜 일정 한도 도달</p>
-            <p className="text-xs text-muted-foreground mt-0.5">현재 {todos.length}/{FREE_TASK_LIMIT}개 사용 중. 더 많은 일정을 만들려면 Pro 플랜으로 업그레이드하세요.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">현재 {totalTodos}/{FREE_TASK_LIMIT}개 사용 중. 더 많은 일정을 만들려면 Pro 플랜으로 업그레이드하세요.</p>
           </div>
         </motion.div>
       )}
@@ -540,7 +510,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {todos.length === 0 ? (
+          {totalTodos === 0 && !isLoading ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -554,7 +524,7 @@ export default function DashboardPage() {
                 You're all caught up! Click the "New Task" button to add something to your list.
               </p>
             </motion.div>
-          ) : incompleteTodos.length === 0 && completedTodos.length === 0 && searchQuery ? (
+          ) : totalTodos === 0 && searchQuery ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -571,87 +541,89 @@ export default function DashboardPage() {
             </motion.div>
           ) : (
             <>
-              {totalSelected > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-2 p-3 rounded-md bg-primary/10 border border-primary/20"
-                  data-testid="bar-selection-actions"
-                >
-                  <span className="text-sm text-muted-foreground mr-auto" data-testid="text-selected-count">
-                    {totalSelected} selected
-                  </span>
-                  {selectedActiveCount > 0 && (
-                    <Button
-                      size="sm"
-                      onClick={handleCompleteSelected}
-                      data-testid="button-complete-selected"
-                    >
-                      <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                      Complete
-                    </Button>
-                  )}
-                  {selectedCompletedCount > 0 && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleUncompleteSelected}
-                      data-testid="button-uncomplete-selected"
-                    >
-                      Undo
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={handleDeleteSelected}
-                    data-testid="button-delete-selected"
-                  >
-                    <Trash2 className="mr-1.5 h-4 w-4" />
-                    Delete
-                  </Button>
-                </motion.div>
-              )}
-
-              {incompleteTodos.length > 0 && (
+              {(incompleteTodos.length > 0 || isActiveLoading) && (
                 <div className="space-y-3">
-                  <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider" data-testid="text-section-active">
-                    Active ({incompleteTodos.length})
-                  </h2>
-                  <div className="grid gap-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider" data-testid="text-section-active">
+                      Active ({activeData?.totalCount ?? 0})
+                    </h2>
+                    {selectedActiveIds.size > 0 && (
+                      <Button size="sm" onClick={handleCompleteSelected} data-testid="button-complete-selected">
+                        <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                        Complete ({selectedActiveIds.size})
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid gap-3 min-h-[200px]">
                     <AnimatePresence mode="popLayout">
                       {incompleteTodos.map((todo) => (
                         <TodoCard
                           key={todo.id}
                           todo={todo}
-                          selected={selectedIds.has(todo.id)}
-                          onSelect={toggleSelect}
+                          selected={selectedActiveIds.has(todo.id)}
+                          onSelect={toggleActiveSelect}
                           onEdit={openEditDialog}
+                          onDelete={(id) => deleteTodo(id)}
                         />
                       ))}
                     </AnimatePresence>
                   </div>
+                  {(activeData?.totalPages ?? 0) > 1 && (
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" disabled={activePage === 0} onClick={() => setActivePage(p => p - 1)}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground">{activePage + 1} / {activeData?.totalPages}</span>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" disabled={activePage + 1 === activeData?.totalPages} onClick={() => setActivePage(p => p + 1)}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {completedTodos.length > 0 && (
+              {(completedTodos.length > 0 || isCompletedLoading) && (
                 <div className="space-y-3">
-                  <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider" data-testid="text-section-completed">
-                    Completed ({completedTodos.length})
-                  </h2>
-                  <div className="grid gap-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider" data-testid="text-section-completed">
+                      Completed ({completedData?.totalCount ?? 0})
+                    </h2>
+                    {selectedCompletedIds.size > 0 && (
+                      <Button
+                        size="sm"
+                        onClick={handleUndoSelected}
+                        className="bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/35"
+                        data-testid="button-undo-selected"
+                      >
+                        <RotateCcw className="mr-1.5 h-4 w-4" />
+                        Undo ({selectedCompletedIds.size})
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid gap-3 min-h-[200px]">
                     <AnimatePresence mode="popLayout">
                       {completedTodos.map((todo) => (
                         <TodoCard
                           key={todo.id}
                           todo={todo}
-                          selected={selectedIds.has(todo.id)}
-                          onSelect={toggleSelect}
-                          onEdit={openEditDialog}
+                          selected={selectedCompletedIds.has(todo.id)}
+                          onSelect={toggleCompletedSelect}
+                          highlight={highlightDate !== null && todo.completedAt === highlightDate}
                         />
                       ))}
                     </AnimatePresence>
                   </div>
+                  {(completedData?.totalPages ?? 0) > 1 && (
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" disabled={completedPage === 0} onClick={() => setCompletedPage(p => p - 1)}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground">{completedPage + 1} / {completedData?.totalPages}</span>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" disabled={completedPage + 1 === completedData?.totalPages} onClick={() => setCompletedPage(p => p + 1)}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -666,8 +638,10 @@ const TodoCard = forwardRef<HTMLDivElement, {
   todo: Todo;
   selected: boolean;
   onSelect: (id: number) => void;
-  onEdit: (todo: Todo) => void;
-}>(function TodoCard({ todo, selected, onSelect, onEdit }, ref) {
+  onEdit?: (todo: Todo) => void;
+  onDelete?: (id: number) => void;
+  highlight?: boolean;
+}>(function TodoCard({ todo, selected, onSelect, onEdit, onDelete, highlight }, ref) {
   return (
     <motion.div
       ref={ref}
@@ -680,8 +654,8 @@ const TodoCard = forwardRef<HTMLDivElement, {
     >
       <Card className={`
         border shadow-sm transition-all duration-200
-        ${selected ? 'border-primary/40 bg-primary/5' : 'border-white/5'}
-        ${todo.completed ? 'bg-card/40 opacity-60' : 'bg-card'}
+        ${highlight ? 'border-yellow-400/60 bg-yellow-500/10' : selected ? 'border-primary/40 bg-primary/5' : 'border-white/5'}
+        ${todo.completed && !highlight ? 'bg-card/40 opacity-60' : !highlight ? 'bg-card' : ''}
       `}>
         <CardContent className="p-4 flex items-start gap-4">
           <div className="pt-1">
@@ -712,14 +686,27 @@ const TodoCard = forwardRef<HTMLDivElement, {
             )}
           </div>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onEdit(todo)}
-            data-testid={`button-edit-todo-${todo.id}`}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
+          {onEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onEdit(todo)}
+              data-testid={`button-edit-todo-${todo.id}`}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onDelete(todo.id)}
+              className="text-muted-foreground hover:text-destructive"
+              data-testid={`button-delete-todo-${todo.id}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </CardContent>
       </Card>
     </motion.div>

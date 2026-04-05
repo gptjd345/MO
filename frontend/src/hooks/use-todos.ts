@@ -3,11 +3,6 @@ import { useToast } from "@/hooks/use-toast";
 import { authHeaders, tryRefresh } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 
-export interface TodoUpdateResponse {
-  todo: Todo;
-  pointsEarned: number;
-}
-
 export interface Todo {
   id: number;
   title: string;
@@ -17,8 +12,16 @@ export interface Todo {
   endDate: string | null;
   priority: "HIGH" | "MEDIUM" | "LOW";
   userId: number;
+  completedAt: string | null;
 }
 
+export interface PagedTodoResponse {
+  content: Todo[];
+  totalCount: number;
+  totalPages: number;
+}
+
+export type SortOption = "newest" | "oldest" | "name" | "deadline" | "priority";
 
 async function fetchWithRefresh(url: string, init: RequestInit = {}): Promise<Response> {
   let res = await fetch(url, { ...init, headers: authHeaders(init.headers as Record<string, string>) });
@@ -31,19 +34,45 @@ async function fetchWithRefresh(url: string, init: RequestInit = {}): Promise<Re
   return res;
 }
 
-export function useTodos() {
+function buildTodoUrl(completed: boolean, page: number, sort: SortOption, search: string): string {
+  const params = new URLSearchParams({
+    completed: String(completed),
+    page: String(page),
+    size: "10",
+    sort,
+  });
+  if (search) params.set("search", search);
+  return `/api/todos?${params}`;
+}
+
+export function useActiveTodos(page: number, sort: SortOption, search: string) {
+  return useQuery<PagedTodoResponse>({
+    queryKey: ["todos", "active", page, sort, search],
+    queryFn: async () => {
+      const res = await fetchWithRefresh(buildTodoUrl(false, page, sort, search));
+      if (!res.ok) throw new Error("Failed to fetch active todos");
+      return res.json();
+    },
+  });
+}
+
+export function useCompletedTodos(page: number, sort: SortOption, search: string) {
+  return useQuery<PagedTodoResponse>({
+    queryKey: ["todos", "completed", page, sort, search],
+    queryFn: async () => {
+      const res = await fetchWithRefresh(buildTodoUrl(true, page, sort, search));
+      if (!res.ok) throw new Error("Failed to fetch completed todos");
+      return res.json();
+    },
+  });
+}
+
+export function useTodoMutations() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { addScore } = useAuth();
 
-  const todosQuery = useQuery<Todo[]>({
-    queryKey: ["/api/todos"],
-    queryFn: async () => {
-      const res = await fetchWithRefresh("/api/todos");
-      if (!res.ok) throw new Error("Failed to fetch todos");
-      return await res.json();
-    },
-  });
+  const invalidateTodos = () => queryClient.invalidateQueries({ queryKey: ["todos"] });
 
   const createTodoMutation = useMutation({
     mutationFn: async (data: { title: string; content?: string; startDate?: string; endDate?: string; priority?: string }) => {
@@ -56,7 +85,7 @@ export function useTodos() {
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      invalidateTodos();
       toast({ title: "Task added", description: "Let's get this done." });
     },
     onError: (error: Error) => {
@@ -65,7 +94,7 @@ export function useTodos() {
   });
 
   const updateTodoMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: number; title?: string; content?: string; completed?: boolean; startDate?: string; endDate?: string; priority?: string }): Promise<TodoUpdateResponse> => {
+    mutationFn: async ({ id, ...data }: { id: number; title?: string; content?: string; startDate?: string; endDate?: string; priority?: string }): Promise<Todo> => {
       const res = await fetchWithRefresh(`/api/todos/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -74,22 +103,39 @@ export function useTodos() {
       if (!res.ok) throw new Error("Failed to update todo");
       return await res.json();
     },
+    onSuccess: () => {
+      invalidateTodos();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const batchUndoMutation = useMutation({
+    mutationFn: async (ids: number[]): Promise<{ totalPointsDeducted: number }> => {
+      const res = await fetchWithRefresh("/api/todos/batch-undo", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) throw new Error("Failed to undo tasks");
+      return await res.json();
+    },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
-      // stats worker가 처리할 시간을 주고 invalidate
+      invalidateTodos();
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["stats"] });
       }, 800);
-      if (data.pointsEarned > 0) {
-        addScore(data.pointsEarned);
+      if (data.totalPointsDeducted > 0) {
+        addScore(-data.totalPointsDeducted);
         toast({
-          title: `+${data.pointsEarned}점 획득!`,
-          description: data.pointsEarned === 10 ? "기한 내 완료!" : "완료! (기한 초과)",
+          title: `-${data.totalPointsDeducted}점 차감`,
+          description: "완료 취소로 점수가 차감되었어요.",
         });
       }
     },
     onError: (error: Error) => {
-      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -104,7 +150,7 @@ export function useTodos() {
       return await res.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      invalidateTodos();
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["stats"] });
       }, 800);
@@ -127,7 +173,7 @@ export function useTodos() {
       if (!res.ok) throw new Error("Failed to delete todo");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/todos"] });
+      invalidateTodos();
       toast({ title: "Task deleted", description: "Cleared from your list." });
     },
     onError: (error: Error) => {
@@ -136,14 +182,12 @@ export function useTodos() {
   });
 
   return {
-    todos: todosQuery.data ?? [],
-    isLoading: todosQuery.isLoading,
-    isError: todosQuery.isError,
     createTodo: createTodoMutation.mutate,
     isCreating: createTodoMutation.isPending,
     updateTodo: updateTodoMutation.mutate,
     isUpdating: updateTodoMutation.isPending,
     batchComplete: batchCompleteMutation.mutate,
+    batchUndo: batchUndoMutation.mutate,
     deleteTodo: deleteTodoMutation.mutate,
   };
 }

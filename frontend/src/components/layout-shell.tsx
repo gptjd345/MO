@@ -1,6 +1,6 @@
 import { ReactNode, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useTodos } from "@/hooks/use-todos";
+import { useActiveTodos, useCompletedTodos } from "@/hooks/use-todos";
 import { Link } from "wouter";
 import { LogOut, LayoutDashboard, CheckCircle2, Crown, Zap, Check, X, Loader2, AlertTriangle, RefreshCw, Star, Heart, Menu, CalendarDays } from "lucide-react";
 import { useLocation } from "wouter";
@@ -320,12 +320,13 @@ function PlanFeature({ included, text, highlight }: { included: boolean; text: s
 
 export function LayoutShell({ children }: LayoutShellProps) {
   const { user, logoutMutation } = useAuth();
-  const { todos } = useTodos();
+  const { data: activeData } = useActiveTodos(0, "newest", "");
+  const { data: completedData } = useCompletedTodos(0, "newest", "");
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [location] = useLocation();
 
-  const taskCount = todos.length;
+  const taskCount = (activeData?.totalCount ?? 0) + (completedData?.totalCount ?? 0);
   const isPro = user?.plan === "PRO";
 
   const navItems = (

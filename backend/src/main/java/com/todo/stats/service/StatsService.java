@@ -5,10 +5,12 @@ import com.todo.stats.domain.StreakStat;
 import com.todo.stats.domain.WeeklyStat;
 import com.todo.stats.infrastructure.DailyStatRepository;
 import com.todo.stats.infrastructure.StreakStatRepository;
+import com.todo.stats.infrastructure.TodoEventRepository;
 import com.todo.stats.infrastructure.WeeklyStatRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.IsoFields;
 import java.util.*;
@@ -19,13 +21,16 @@ public class StatsService {
     private final DailyStatRepository dailyStatRepository;
     private final WeeklyStatRepository weeklyStatRepository;
     private final StreakStatRepository streakStatRepository;
+    private final TodoEventRepository todoEventRepository;
 
     public StatsService(DailyStatRepository dailyStatRepository,
                         WeeklyStatRepository weeklyStatRepository,
-                        StreakStatRepository streakStatRepository) {
+                        StreakStatRepository streakStatRepository,
+                        TodoEventRepository todoEventRepository) {
         this.dailyStatRepository = dailyStatRepository;
         this.weeklyStatRepository = weeklyStatRepository;
         this.streakStatRepository = streakStatRepository;
+        this.todoEventRepository = todoEventRepository;
     }
 
     public List<DailyStat> getMonthlyCalendar(Long userId, int year, int month) {
@@ -47,6 +52,13 @@ public class StatsService {
                     s.setUserId(userId);
                     return s;
                 });
+    }
+
+    public boolean isCurrentWeekActive(Long userId) {
+        LocalDate weekStart = LocalDate.now().with(DayOfWeek.MONDAY);
+        LocalDate weekEnd = LocalDate.now().with(DayOfWeek.SUNDAY);
+        return todoEventRepository.existsByUserIdAndEventTypeAndEventDateBetween(
+                userId, "COMPLETED", weekStart, weekEnd);
     }
 
     public List<WeeklyStat> getRecentWeeklyStats(Long userId, int weeks) {
