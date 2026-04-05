@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { LayoutShell } from "@/components/layout-shell";
 import { useCalendarStats, useStreak, useYearlyStats } from "@/hooks/use-stats";
 import { useWeeklyGoal, useSetWeeklyGoal } from "@/hooks/use-weekly-goal";
@@ -66,6 +67,7 @@ function MonthlyCalendar() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth() + 1);
+  const [, navigate] = useLocation();
 
   const { data: calendarData = [] } = useCalendarStats(viewYear, viewMonth);
 
@@ -125,12 +127,14 @@ function MonthlyCalendar() {
             && viewMonth === today.getMonth() + 1
             && day === today.getDate();
 
+          const hasCompleted = completed > 0;
           return (
             <div
               key={day}
-              className={`flex flex-col items-center py-1.5 rounded-lg ${
+              onClick={() => hasCompleted && navigate(`/?completedDate=${dateStr}`)}
+              className={`flex flex-col items-center py-1.5 rounded-lg transition-colors ${
                 isToday ? "bg-primary/20 ring-2 ring-primary" : ""
-              }`}
+              } ${hasCompleted ? "cursor-pointer hover:bg-white/5" : ""}`}
             >
               <span className={`text-xs mb-0.5 font-bold ${
                 isToday ? "text-primary" : "text-muted-foreground/60"
