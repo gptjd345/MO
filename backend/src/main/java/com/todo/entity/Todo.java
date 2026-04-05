@@ -32,9 +32,6 @@ public class Todo {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(nullable = false)
-    private boolean scored;
-
     @Column(name = "completed_at")
     private LocalDate completedAt;
 
@@ -56,8 +53,6 @@ public class Todo {
     public void setPriority(String priority) { this.priority = priority; }
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
-    public boolean isScored() { return scored; }
-    public void setScored(boolean scored) { this.scored = scored; }
     public LocalDate getCompletedAt() { return completedAt; }
     public void setCompletedAt(LocalDate completedAt) { this.completedAt = completedAt; }
 }

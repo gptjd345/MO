@@ -39,7 +39,9 @@ public class StatsController {
 
     @GetMapping("/streak")
     public ResponseEntity<StreakResponse> getStreak(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(new StreakResponse(statsService.getStreak(user.getId())));
+        return ResponseEntity.ok(new StreakResponse(
+                statsService.getStreak(user.getId()),
+                statsService.isCurrentWeekActive(user.getId())));
     }
 
     @GetMapping("/yearly")

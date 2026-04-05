@@ -22,19 +22,18 @@ public class DevController {
 
     private final DailyStatsBatchJob dailyStatsBatchJob;
     private final RankingRebuildJob rankingRebuildJob;
-    private final TodoRepository todoRepository;
-    private final TodoEventRepository todoEventRepository;
 
     public DevController(DailyStatsBatchJob dailyStatsBatchJob,
-                         RankingRebuildJob rankingRebuildJob,
-                         TodoRepository todoRepository,
-                         TodoEventRepository todoEventRepository) {
+                         RankingRebuildJob rankingRebuildJob) {
         this.dailyStatsBatchJob = dailyStatsBatchJob;
         this.rankingRebuildJob = rankingRebuildJob;
-        this.todoRepository = todoRepository;
-        this.todoEventRepository = todoEventRepository;
+
     }
 
+    /***
+     * 일별 돌았어야하는 배치 수동실행
+     * @return
+     */
     @PostMapping("/batch/stats")
     public ResponseEntity<String> runStatsBatch() {
         dailyStatsBatchJob.runJob();
@@ -42,6 +41,10 @@ public class DevController {
         return ResponseEntity.ok("stats + ranking batch 실행 완료");
     }
 
+    /***
+     * 전체 통계 재 계산
+     * @return
+     */
     @GetMapping("/batch/backfill")
     public ResponseEntity<String> runBackfill() {
         dailyStatsBatchJob.runBackfill();
@@ -49,28 +52,5 @@ public class DevController {
         return ResponseEntity.ok("전체 stats backfill + ranking 완료");
     }
 
-    @GetMapping("/batch/seed-events")
-    public ResponseEntity<String> seedTodoEvents() {
-        List<Todo> completedTodos = todoRepository.findAll().stream()
-                .filter(t -> t.isCompleted() && t.getCompletedAt() != null)
-                .toList();
 
-        int created = 0;
-        for (Todo todo : completedTodos) {
-            if (!todoEventRepository.existsByTodoIdAndEventType(todo.getId(), "COMPLETED")) {
-                TodoEvent event = new TodoEvent();
-                event.setUserId(todo.getUserId());
-                event.setTodoId(todo.getId());
-                event.setEventType("COMPLETED");
-                event.setEventDate(todo.getCompletedAt());
-                todoEventRepository.save(event);
-                created++;
-            }
-        }
-
-        dailyStatsBatchJob.runBackfill();
-        rankingRebuildJob.rebuild();
-
-        return ResponseEntity.ok("todo_events 생성: " + created + "건, stats + ranking 갱신 완료");
-    }
 }

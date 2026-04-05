@@ -1,9 +1,9 @@
 package com.todo.controller;
 
 import com.todo.dto.BatchCompleteRequest;
+import com.todo.dto.PagedTodoResponse;
 import com.todo.dto.TodoRequest;
 import com.todo.dto.TodoUpdateRequest;
-import com.todo.dto.TodoUpdateResponse;
 import com.todo.entity.Todo;
 import com.todo.entity.User;
 import com.todo.service.TodoService;
@@ -13,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -27,8 +26,14 @@ public class TodoController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Todo>> list(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(todoService.getTodos(user.getId()));
+    public ResponseEntity<PagedTodoResponse> list(
+            @RequestParam boolean completed,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "newest") String sort,
+            @RequestParam(required = false) String search,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(todoService.getTodosPaged(user.getId(), completed, page, size, sort, search));
     }
 
     @PostMapping
@@ -39,9 +44,9 @@ public class TodoController {
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<TodoUpdateResponse> update(@AuthenticationPrincipal User user,
-                                                     @PathVariable Long id,
-                                                     @RequestBody TodoUpdateRequest request) {
+    public ResponseEntity<Todo> update(@AuthenticationPrincipal User user,
+                                       @PathVariable Long id,
+                                       @RequestBody TodoUpdateRequest request) {
         return ResponseEntity.ok(todoService.updateTodo(id, user.getId(), request));
     }
 
@@ -50,6 +55,13 @@ public class TodoController {
                                                               @RequestBody BatchCompleteRequest request) {
         int totalPoints = todoService.batchComplete(user.getId(), request);
         return ResponseEntity.ok(Map.of("totalPointsEarned", totalPoints));
+    }
+
+    @PatchMapping("/batch-undo")
+    public ResponseEntity<Map<String, Integer>> batchUndo(@AuthenticationPrincipal User user,
+                                                          @RequestBody BatchCompleteRequest request) {
+        int totalPointsDeducted = todoService.batchUndo(user.getId(), request);
+        return ResponseEntity.ok(Map.of("totalPointsDeducted", totalPointsDeducted));
     }
 
     @DeleteMapping("/{id}")

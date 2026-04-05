@@ -10,9 +10,9 @@ public class StreakResponse {
     private final Integer lastWeekAchieved;
     private final Integer lastYearAchieved;
 
-    public StreakResponse(StreakStat stat) {
-        this.currentStreak = stat.getCurrentStreak();
-        this.longestStreak = stat.getLongestStreak();
+    public StreakResponse(StreakStat stat, boolean currentWeekActive) {
+        this.currentStreak = stat.getCurrentStreak() + (currentWeekActive ? 1 : 0);
+        this.longestStreak = Math.max(stat.getLongestStreak(), this.currentStreak);
         this.isFreezed = stat.isFreezed();
         this.lastWeekAchieved = stat.getLastWeekAchieved();
         this.lastYearAchieved = stat.getLastYearAchieved();

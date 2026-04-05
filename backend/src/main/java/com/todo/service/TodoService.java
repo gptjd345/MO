@@ -1,9 +1,9 @@
 package com.todo.service;
 
 import com.todo.dto.BatchCompleteRequest;
+import com.todo.dto.PagedTodoResponse;
 import com.todo.dto.TodoRequest;
 import com.todo.dto.TodoUpdateRequest;
-import com.todo.dto.TodoUpdateResponse;
 import com.todo.entity.Todo;
 import com.todo.entity.User;
 import com.todo.exception.CustomException;
@@ -14,12 +14,19 @@ import com.todo.repository.UserRepository;
 import com.todo.stats.domain.TodoEvent;
 import com.todo.stats.infrastructure.StatsStreamPublisher;
 import com.todo.stats.infrastructure.TodoEventRepository;
+import jakarta.persistence.criteria.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -49,6 +56,41 @@ public class TodoService {
         return todoRepository.findByUserIdOrderByIdDesc(userId);
     }
 
+    public PagedTodoResponse getTodosPaged(Long userId, boolean completed, int page, int size, String sort, String search) {
+        boolean hasSearch = search != null && !search.isBlank();
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Todo> result;
+
+        if ("priority".equals(sort)) {
+            result = hasSearch
+                    ? todoRepository.findByUserIdAndCompletedAndSearchOrderByPriority(userId, completed, search, pageable)
+                    : todoRepository.findByUserIdAndCompletedOrderByPriority(userId, completed, pageable);
+        } else {
+            Sort springSort = switch (sort) {
+                case "oldest" -> Sort.by("id").ascending();
+                case "name" -> Sort.by("title").ascending();
+                case "deadline" -> Sort.by(Sort.Order.asc("endDate").nullsLast());
+                default -> Sort.by("id").descending();
+            };
+            Specification<Todo> spec = (root, query, cb) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                predicates.add(cb.equal(root.get("userId"), userId));
+                predicates.add(cb.equal(root.get("completed"), completed));
+                if (hasSearch) {
+                    String like = "%" + search.toLowerCase() + "%";
+                    predicates.add(cb.or(
+                            cb.like(cb.lower(root.get("title")), like),
+                            cb.like(cb.lower(cb.coalesce(root.get("content"), "")), like)
+                    ));
+                }
+                return cb.and(predicates.toArray(new Predicate[0]));
+            };
+            result = todoRepository.findAll(spec, PageRequest.of(page, size, springSort));
+        }
+
+        return new PagedTodoResponse(result.getContent(), result.getTotalElements(), result.getTotalPages());
+    }
+
     public Todo createTodo(Long userId, TodoRequest request) {
         Todo todo = new Todo();
         todo.setTitle(request.getTitle());
@@ -67,7 +109,7 @@ public class TodoService {
     }
 
     @Transactional
-    public TodoUpdateResponse updateTodo(Long id, Long userId, TodoUpdateRequest request) {
+    public Todo updateTodo(Long id, Long userId, TodoUpdateRequest request) {
         Todo todo = todoRepository.findById(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.TODO_NOT_FOUND));
 
@@ -86,61 +128,7 @@ public class TodoService {
             todo.setEndDate(request.getEndDate().isEmpty() ? null : LocalDate.parse(request.getEndDate()));
         }
 
-        int pointsEarned = 0;
-        User scoredUser = null;
-
-        if (request.getCompleted() != null) {
-            boolean wasCompleted = todo.isCompleted();
-            boolean nowCompleted = request.getCompleted();
-            todo.setCompleted(nowCompleted);
-
-            if (!wasCompleted && nowCompleted) {
-                // false → true: 완료 처리
-                LocalDate completedAt = LocalDate.now();
-                todo.setCompletedAt(completedAt);
-
-                if (!todo.isScored()) {
-                    pointsEarned = calculatePoints(todo);
-                    scoredUser = userRepository.findById(userId)
-                            .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-                    scoredUser.setScore(scoredUser.getScore() + pointsEarned);
-                    scoredUser.setRankingVersion(scoredUser.getRankingVersion() + 1);
-                    userRepository.save(scoredUser);
-                    todo.setScored(true);
-                }
-
-                recordTodoEvent(userId, todo.getId(), "COMPLETED", completedAt);
-
-            } else if (wasCompleted && !nowCompleted) {
-                // true → false: 완료 취소 (소급 처리는 배치가 담당)
-                LocalDate originalCompletedAt = todo.getCompletedAt();
-                todo.setCompletedAt(null);
-
-                if (originalCompletedAt != null) {
-                    recordTodoEvent(userId, todo.getId(), "CANCELLED", originalCompletedAt);
-                }
-            }
-        }
-
-        Todo saved = todoRepository.save(todo);
-
-        if (pointsEarned > 0 && scoredUser != null) {
-            try {
-                redisStreamConsumer.publish(userId, scoredUser.getScore(), scoredUser.getRankingVersion());
-            } catch (Exception e) {
-                log.warn("Ranking event publish failed for userId={}: {}", userId, e.getMessage());
-            }
-        }
-
-        if (request.getCompleted() != null && request.getCompleted() && saved.getCompletedAt() != null) {
-            try {
-                statsStreamPublisher.publishCompleted(userId, saved.getId(), saved.getCompletedAt());
-            } catch (Exception e) {
-                log.warn("Stats event publish failed for userId={}: {}", userId, e.getMessage());
-            }
-        }
-
-        return new TodoUpdateResponse(saved, pointsEarned);
+        return todoRepository.save(todo);
     }
 
     @Transactional
@@ -154,12 +142,11 @@ public class TodoService {
 
         for (Todo todo : todos) {
             if (!todo.getUserId().equals(userId)) continue;
-            if (todo.isCompleted() || todo.isScored()) continue;
+            if (todo.isCompleted()) continue;
 
             int points = calculatePoints(todo);
             todo.setCompleted(true);
             todo.setCompletedAt(today);
-            todo.setScored(true);
             todoRepository.save(todo);
             totalPoints += points;
             newlyCompletedIds.add(todo.getId());
@@ -193,6 +180,46 @@ public class TodoService {
         return totalPoints;
     }
 
+    @Transactional
+    public int batchUndo(Long userId, BatchCompleteRequest request) {
+        if (request.getIds() == null || request.getIds().isEmpty()) return 0;
+
+        List<Todo> todos = todoRepository.findAllById(request.getIds());
+        int totalPointsDeducted = 0;
+
+        for (Todo todo : todos) {
+            if (!todo.getUserId().equals(userId)) continue;
+            if (!todo.isCompleted()) continue;
+
+            LocalDate originalCompletedAt = todo.getCompletedAt();
+            int pointsToDeduct = calculateEarnedPoints(originalCompletedAt, todo.getEndDate());
+            todo.setCompleted(false);
+            todo.setCompletedAt(null);
+            todoRepository.save(todo);
+            totalPointsDeducted += pointsToDeduct;
+
+            if (originalCompletedAt != null) {
+                recordTodoEvent(userId, todo.getId(), "CANCELLED", originalCompletedAt);
+            }
+        }
+
+        if (totalPointsDeducted > 0) {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+            user.setScore(Math.max(0, user.getScore() - totalPointsDeducted));
+            user.setRankingVersion(user.getRankingVersion() + 1);
+            userRepository.save(user);
+
+            try {
+                redisStreamConsumer.publish(userId, user.getScore(), user.getRankingVersion());
+            } catch (Exception e) {
+                log.warn("Ranking event publish failed for userId={}: {}", userId, e.getMessage());
+            }
+        }
+
+        return totalPointsDeducted;
+    }
+
     private void recordTodoEvent(Long userId, Long todoId, String eventType, LocalDate eventDate) {
         try {
             TodoEvent event = new TodoEvent();
@@ -211,12 +238,21 @@ public class TodoService {
         return LocalDate.now().isAfter(todo.getEndDate()) ? 5 : 10;
     }
 
+    private int calculateEarnedPoints(LocalDate completedAt, LocalDate endDate) {
+        if (endDate == null || completedAt == null) return 10;
+        return completedAt.isAfter(endDate) ? 5 : 10;
+    }
+
     public void deleteTodo(Long id, Long userId) {
         Todo todo = todoRepository.findById(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.TODO_NOT_FOUND));
 
         if (!todo.getUserId().equals(userId)) {
             throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
+        if (todo.isCompleted()) {
+            throw new CustomException(ErrorCode.TODO_ALREADY_COMPLETED);
         }
 
         todoRepository.delete(todo);

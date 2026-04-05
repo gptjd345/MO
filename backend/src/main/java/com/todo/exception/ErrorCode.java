@@ -24,6 +24,9 @@ public enum ErrorCode {
     // Todo : 404
     TODO_NOT_FOUND(HttpStatus.NOT_FOUND, "Todo not found"),
 
+    // Todo : 400
+    TODO_ALREADY_COMPLETED(HttpStatus.BAD_REQUEST, "Completed todos cannot be deleted. Undo first."),
+
     // Stats : 400
     GOAL_SETTING_LOCKED(HttpStatus.BAD_REQUEST, "Goal can only be set on Monday of target week or Sunday before next week");
 
