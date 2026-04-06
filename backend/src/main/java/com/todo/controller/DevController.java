@@ -4,7 +4,6 @@ import com.todo.ranking.worker.RankingRebuildJob;
 import com.todo.stats.batch.DailyStatsBatchJob;
 import com.todo.stats.domain.TodoEvent;
 import com.todo.stats.infrastructure.TodoEventRepository;
-import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,7 +15,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Profile("dev")
 @RestController
 @RequestMapping("/dev")
 public class DevController {
