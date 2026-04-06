@@ -77,23 +77,6 @@ public class DailyStatsBatchJob {
         }
     }
 
-    public void runBackfill() {
-        log.info("Stats backfill started");
-        List<TodoEvent> allEvents = todoEventRepository.findAll();
-
-        Set<String> pairs = allEvents.stream()
-                .map(e -> e.getUserId() + ":" + e.getEventDate())
-                .collect(Collectors.toSet());
-
-        for (String pair : pairs) {
-            String[] parts = pair.split(":");
-            Long userId = Long.parseLong(parts[0]);
-            LocalDate statDate = LocalDate.parse(parts[1]);
-            recomputeDailyStat(userId, statDate);
-        }
-        log.info("Stats backfill completed: {} (userId, date) pairs", pairs.size());
-    }
-
     @Bean
     public Job statsJob() {
         return new JobBuilder("dailyStatsJob", jobRepository)
@@ -134,7 +117,7 @@ public class DailyStatsBatchJob {
                 .build();
     }
 
-    private void recomputeDailyStat(Long userId, LocalDate date) {
+    public void recomputeDailyStat(Long userId, LocalDate date) {
         // 분자: date에 완료한 todo 수
         Long completedCount = (Long) entityManager.createQuery(
                 "SELECT COUNT(t) FROM Todo t WHERE t.userId = :userId AND t.completedAt = :date")
