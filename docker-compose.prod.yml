@@ -34,6 +34,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   postgres:
     image: postgres:16-alpine
@@ -64,6 +70,45 @@ services:
       timeout: 5s
       retries: 5
 
+  prometheus:
+    image: prom/prometheus
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+      - '--storage.tsdb.retention.size=512MB'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_prod_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      spring:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana
+    restart: always
+    volumes:
+      - grafana_prod_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    depends_on:
+      - prometheus
+
+  pushgateway:
+    image: prom/pushgateway
+    restart: always
+    ports:
+      - "9091:9091"
+    depends_on:
+      spring:
+        condition: service_healthy
+
 volumes:
   postgres_prod_data:
   redis_prod_data:
+  prometheus_prod_data:
+  grafana_prod_data:

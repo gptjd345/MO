@@ -44,6 +44,7 @@ public class DailyStatsBatchJob {
     private final WeeklyStatRepository weeklyStatRepository;
     private final StreakStatRepository streakStatRepository;
     private final WeeklyGoalRepository weeklyGoalRepository;
+    private final BatchMetricsPusher metricsPusher;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -55,7 +56,8 @@ public class DailyStatsBatchJob {
                                DailyStatRepository dailyStatRepository,
                                WeeklyStatRepository weeklyStatRepository,
                                StreakStatRepository streakStatRepository,
-                               WeeklyGoalRepository weeklyGoalRepository) {
+                               WeeklyGoalRepository weeklyGoalRepository,
+                               BatchMetricsPusher metricsPusher) {
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.jobLauncher = jobLauncher;
@@ -64,17 +66,23 @@ public class DailyStatsBatchJob {
         this.weeklyStatRepository = weeklyStatRepository;
         this.streakStatRepository = streakStatRepository;
         this.weeklyGoalRepository = weeklyGoalRepository;
+        this.metricsPusher = metricsPusher;
     }
 
     @Scheduled(cron = "${batch.stats.cron:0 0 1 * * *}")
     public void runJob() {
+        long start = System.currentTimeMillis();
+        boolean success = false;
         try {
             JobParameters params = new JobParametersBuilder()
                     .addLocalDateTime("runAt", LocalDateTime.now())
                     .toJobParameters();
             jobLauncher.run(statsJob(), params);
+            success = true;
         } catch (Exception e) {
             log.error("DailyStatsBatchJob failed: {}", e.getMessage(), e);
+        } finally {
+            metricsPusher.push("dailyStatsJob", System.currentTimeMillis() - start, success);
         }
     }
 
