@@ -198,7 +198,7 @@ public class DailyStatsBatchJob {
                 .build();
     }
 
-    private void recomputeWeeklyStat(Long userId, int year, int weekNumber) {
+    public void recomputeWeeklyStat(Long userId, int year, int weekNumber) {
         // 해당 주의 daily_stats 합산
         // ISO 주: 월요일 시작
         LocalDate weekStart = LocalDate.now()
@@ -334,5 +334,58 @@ public class DailyStatsBatchJob {
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();
+    }
+
+    public void rebuildStreakFromHistory(Long userId) {
+        List<WeeklyStat> weeklyStats = weeklyStatRepository.findByUserIdOrderByYearAscWeekNumberAsc(userId);
+
+        int currentStreak = 0;
+        int longestStreak = 0;
+        boolean freezed = false;
+        Integer freezeYear = null;
+        Integer freezeWeek = null;
+        Integer lastWeekAchieved = null;
+        Integer lastYearAchieved = null;
+
+        for (WeeklyStat week : weeklyStats) {
+            if (week.isGoalAchieved()) {
+                currentStreak++;
+                if (currentStreak > longestStreak) longestStreak = currentStreak;
+                freezed = false;
+                freezeYear = null;
+                freezeWeek = null;
+                lastWeekAchieved = week.getWeekNumber();
+                lastYearAchieved = week.getYear();
+            } else if (week.getCompletedCount() > 0) {
+                if (!freezed) {
+                    freezed = true;
+                    freezeYear = week.getYear();
+                    freezeWeek = week.getWeekNumber();
+                } else {
+                    currentStreak = 0;
+                    freezed = false;
+                    freezeYear = null;
+                    freezeWeek = null;
+                    lastWeekAchieved = null;
+                    lastYearAchieved = null;
+                }
+            }
+        }
+
+        StreakStat stat = streakStatRepository.findByUserId(userId).orElseGet(() -> {
+            StreakStat s = new StreakStat();
+            s.setUserId(userId);
+            return s;
+        });
+        stat.setCurrentStreak(currentStreak);
+        stat.setLongestStreak(longestStreak);
+        stat.setFreezed(freezed);
+        stat.setFreezeYear(freezeYear);
+        stat.setFreezeWeek(freezeWeek);
+        stat.setLastWeekAchieved(lastWeekAchieved);
+        stat.setLastYearAchieved(lastYearAchieved);
+        stat.setUpdatedAt(LocalDateTime.now());
+        streakStatRepository.save(stat);
+        log.info("streak rebuilt for userId={}: currentStreak={}, longestStreak={}", userId, currentStreak, longestStreak);
     }
 }

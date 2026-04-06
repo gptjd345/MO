@@ -12,6 +12,8 @@ public interface WeeklyStatRepository extends JpaRepository<WeeklyStat, Long> {
 
     Optional<WeeklyStat> findByUserIdAndYearAndWeekNumber(Long userId, int year, int weekNumber);
 
+    List<WeeklyStat> findByUserIdOrderByYearAscWeekNumberAsc(Long userId);
+
     @Query("SELECT w FROM WeeklyStat w WHERE w.userId = :userId ORDER BY w.year DESC, w.weekNumber DESC")
     List<WeeklyStat> findRecentByUserId(@Param("userId") Long userId,
                                         org.springframework.data.domain.Pageable pageable);
