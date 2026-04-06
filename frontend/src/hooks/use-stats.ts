@@ -4,8 +4,6 @@ import { authHeaders, tryRefresh } from "@/lib/queryClient";
 export interface CalendarDay {
   date: string;
   completedCount: number;
-  scheduledCount: number;
-  completionRate: number;
 }
 
 export interface StreakData {

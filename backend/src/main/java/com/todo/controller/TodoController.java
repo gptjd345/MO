@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+
 import java.util.Map;
 
 @RestController
@@ -62,6 +64,16 @@ public class TodoController {
                                                           @RequestBody BatchCompleteRequest request) {
         int totalPointsDeducted = todoService.batchUndo(user.getId(), request);
         return ResponseEntity.ok(Map.of("totalPointsDeducted", totalPointsDeducted));
+    }
+
+    @GetMapping("/find-page")
+    public ResponseEntity<Map<String, Integer>> findCompletedPage(
+            @AuthenticationPrincipal User user,
+            @RequestParam String completedAt,
+            @RequestParam(defaultValue = "10") int size) {
+        LocalDate date = LocalDate.parse(completedAt);
+        int page = todoService.findCompletedPage(user.getId(), date, size);
+        return ResponseEntity.ok(Map.of("page", page));
     }
 
     @DeleteMapping("/{id}")

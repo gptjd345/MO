@@ -26,6 +26,7 @@ import jakarta.persistence.PersistenceContext;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.IsoFields;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -230,7 +231,7 @@ public class DailyStatsBatchJob {
         boolean achieved = weeklyGoalRepository
                 .findByUserIdAndYearAndWeekNumber(userId, year, weekNumber)
                 .map(goal -> totalCompleted >= goal.getGoalCount())
-                .orElse(false);
+                .orElse(totalCompleted >= 3);
         stat.setGoalAchieved(achieved);
         stat.setUpdatedAt(LocalDateTime.now());
         weeklyStatRepository.save(stat);
@@ -288,6 +289,12 @@ public class DailyStatsBatchJob {
                                     s.setUserId(userId);
                                     return s;
                                 });
+
+                        // rebuildStreakFromHistory가 이미 이 주를 반영한 경우 이중 카운팅 방지
+                        if (Integer.valueOf(lastWeek).equals(streak.getLastWeekAchieved())
+                                && Integer.valueOf(lastYear).equals(streak.getLastYearAchieved())) {
+                            continue;
+                        }
 
                         streak.setCurrentStreak(streak.getCurrentStreak() + 1);
                         if (streak.getCurrentStreak() > streak.getLongestStreak()) {
@@ -347,7 +354,28 @@ public class DailyStatsBatchJob {
         Integer lastWeekAchieved = null;
         Integer lastYearAchieved = null;
 
+        WeeklyStat prev = null;
+
         for (WeeklyStat week : weeklyStats) {
+            if (prev != null) {
+                long gap = weeksBetween(prev.getYear(), prev.getWeekNumber(), week.getYear(), week.getWeekNumber());
+                if (gap >= 3 || (gap >= 2 && freezed)) {
+                    // 빈 주 2개 이상이거나, 이미 freeze 중에 빈 주 1개 추가 → 리셋
+                    currentStreak = 0;
+                    freezed = false;
+                    freezeYear = null;
+                    freezeWeek = null;
+                    lastWeekAchieved = null;
+                    lastYearAchieved = null;
+                } else if (gap == 2 && currentStreak > 0) {
+                    // 빈 주 1개 → freeze 유예 시작
+                    freezed = true;
+                    LocalDate emptyWeek = weekMonday(prev.getYear(), prev.getWeekNumber()).plusWeeks(1);
+                    freezeYear = emptyWeek.get(IsoFields.WEEK_BASED_YEAR);
+                    freezeWeek = emptyWeek.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+                }
+            }
+
             if (week.isGoalAchieved()) {
                 currentStreak++;
                 if (currentStreak > longestStreak) longestStreak = currentStreak;
@@ -370,6 +398,29 @@ public class DailyStatsBatchJob {
                     lastYearAchieved = null;
                 }
             }
+
+            prev = week;
+        }
+
+        // 마지막 기록 이후 현재까지의 공백 체크
+        if (prev != null) {
+            LocalDate now = LocalDate.now();
+            int currentYear = now.get(IsoFields.WEEK_BASED_YEAR);
+            int currentWeek = now.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+            long gapToNow = weeksBetween(prev.getYear(), prev.getWeekNumber(), currentYear, currentWeek);
+            if (gapToNow >= 3 || (gapToNow >= 2 && freezed)) {
+                currentStreak = 0;
+                freezed = false;
+                freezeYear = null;
+                freezeWeek = null;
+                lastWeekAchieved = null;
+                lastYearAchieved = null;
+            } else if (gapToNow == 2 && currentStreak > 0) {
+                freezed = true;
+                LocalDate emptyWeek = weekMonday(prev.getYear(), prev.getWeekNumber()).plusWeeks(1);
+                freezeYear = emptyWeek.get(IsoFields.WEEK_BASED_YEAR);
+                freezeWeek = emptyWeek.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+            }
         }
 
         StreakStat stat = streakStatRepository.findByUserId(userId).orElseGet(() -> {
@@ -387,5 +438,16 @@ public class DailyStatsBatchJob {
         stat.setUpdatedAt(LocalDateTime.now());
         streakStatRepository.save(stat);
         log.info("streak rebuilt for userId={}: currentStreak={}, longestStreak={}", userId, currentStreak, longestStreak);
+    }
+
+    private LocalDate weekMonday(int year, int week) {
+        return LocalDate.now()
+                .with(IsoFields.WEEK_BASED_YEAR, year)
+                .with(IsoFields.WEEK_OF_WEEK_BASED_YEAR, week)
+                .with(DayOfWeek.MONDAY);
+    }
+
+    private long weeksBetween(int year1, int week1, int year2, int week2) {
+        return ChronoUnit.WEEKS.between(weekMonday(year1, week1), weekMonday(year2, week2));
     }
 }

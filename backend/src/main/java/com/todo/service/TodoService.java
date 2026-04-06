@@ -243,6 +243,13 @@ public class TodoService {
         return completedAt.isAfter(endDate) ? 5 : 10;
     }
 
+    public int findCompletedPage(Long userId, LocalDate completedAt, int pageSize) {
+        Long maxId = todoRepository.findMaxIdByCompletedAt(userId, completedAt);
+        if (maxId == null) return 0;
+        long count = todoRepository.countCompletedWithIdGreaterThan(userId, maxId);
+        return (int) (count / pageSize);
+    }
+
     public void deleteTodo(Long id, Long userId) {
         Todo todo = todoRepository.findById(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.TODO_NOT_FOUND));

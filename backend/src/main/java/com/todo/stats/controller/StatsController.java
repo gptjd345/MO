@@ -31,17 +31,14 @@ public class StatsController {
         int y = year != null ? year : LocalDate.now().getYear();
         int m = month != null ? month : LocalDate.now().getMonthValue();
 
-        List<CalendarDayResponse> result = statsService.getMonthlyCalendar(user.getId(), y, m)
-                .stream().map(CalendarDayResponse::new).toList();
-
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(statsService.getMonthlyCalendar(user.getId(), y, m));
     }
 
     @GetMapping("/streak")
     public ResponseEntity<StreakResponse> getStreak(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(new StreakResponse(
                 statsService.getStreak(user.getId()),
-                statsService.isCurrentWeekActive(user.getId())));
+                statsService.isCurrentWeekGoalAchieved(user.getId())));
     }
 
     @GetMapping("/yearly")
@@ -50,9 +47,7 @@ public class StatsController {
             @AuthenticationPrincipal User user) {
 
         int y = year != null ? year : LocalDate.now().getYear();
-        List<CalendarDayResponse> result = statsService.getYearlyCalendar(user.getId(), y)
-                .stream().map(CalendarDayResponse::new).toList();
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(statsService.getYearlyCalendar(user.getId(), y));
     }
 
     @GetMapping("/weekly")

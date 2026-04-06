@@ -1,11 +1,12 @@
 package com.todo.stats.service;
 
-import com.todo.stats.domain.DailyStat;
+import com.todo.repository.TodoRepository;
 import com.todo.stats.domain.StreakStat;
 import com.todo.stats.domain.WeeklyStat;
-import com.todo.stats.infrastructure.DailyStatRepository;
+import com.todo.stats.dto.CalendarDayResponse;
 import com.todo.stats.infrastructure.StreakStatRepository;
 import com.todo.stats.infrastructure.TodoEventRepository;
+import com.todo.stats.infrastructure.WeeklyGoalRepository;
 import com.todo.stats.infrastructure.WeeklyStatRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -18,31 +19,40 @@ import java.util.*;
 @Service
 public class StatsService {
 
-    private final DailyStatRepository dailyStatRepository;
+    private final TodoRepository todoRepository;
     private final WeeklyStatRepository weeklyStatRepository;
     private final StreakStatRepository streakStatRepository;
     private final TodoEventRepository todoEventRepository;
+    private final WeeklyGoalRepository weeklyGoalRepository;
 
-    public StatsService(DailyStatRepository dailyStatRepository,
+    public StatsService(TodoRepository todoRepository,
                         WeeklyStatRepository weeklyStatRepository,
                         StreakStatRepository streakStatRepository,
-                        TodoEventRepository todoEventRepository) {
-        this.dailyStatRepository = dailyStatRepository;
+                        TodoEventRepository todoEventRepository,
+                        WeeklyGoalRepository weeklyGoalRepository) {
+        this.todoRepository = todoRepository;
         this.weeklyStatRepository = weeklyStatRepository;
         this.streakStatRepository = streakStatRepository;
         this.todoEventRepository = todoEventRepository;
+        this.weeklyGoalRepository = weeklyGoalRepository;
     }
 
-    public List<DailyStat> getMonthlyCalendar(Long userId, int year, int month) {
+    public List<CalendarDayResponse> getMonthlyCalendar(Long userId, int year, int month) {
         LocalDate from = LocalDate.of(year, month, 1);
         LocalDate to = from.withDayOfMonth(from.lengthOfMonth());
-        return dailyStatRepository.findByUserIdAndDateRange(userId, from, to);
+        return toCalendarDayResponses(userId, from, to);
     }
 
-    public List<DailyStat> getYearlyCalendar(Long userId, int year) {
+    public List<CalendarDayResponse> getYearlyCalendar(Long userId, int year) {
         LocalDate from = LocalDate.of(year, 1, 1);
         LocalDate to = LocalDate.of(year, 12, 31);
-        return dailyStatRepository.findByUserIdAndDateRange(userId, from, to);
+        return toCalendarDayResponses(userId, from, to);
+    }
+
+    private List<CalendarDayResponse> toCalendarDayResponses(Long userId, LocalDate from, LocalDate to) {
+        return todoRepository.countCompletedByDateBetween(userId, from, to).stream()
+                .map(row -> new CalendarDayResponse((LocalDate) row[0], ((Long) row[1]).intValue()))
+                .toList();
     }
 
     public StreakStat getStreak(Long userId) {
@@ -54,11 +64,19 @@ public class StatsService {
                 });
     }
 
-    public boolean isCurrentWeekActive(Long userId) {
-        LocalDate weekStart = LocalDate.now().with(DayOfWeek.MONDAY);
-        LocalDate weekEnd = LocalDate.now().with(DayOfWeek.SUNDAY);
-        return todoEventRepository.existsByUserIdAndEventTypeAndEventDateBetween(
-                userId, "COMPLETED", weekStart, weekEnd);
+    public boolean isCurrentWeekGoalAchieved(Long userId) {
+        LocalDate now = LocalDate.now();
+        int year = now.get(IsoFields.WEEK_BASED_YEAR);
+        int week = now.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+        LocalDate weekStart = now.with(DayOfWeek.MONDAY);
+        LocalDate weekEnd = now.with(DayOfWeek.SUNDAY);
+
+        int goal = weeklyGoalRepository.findByUserIdAndYearAndWeekNumber(userId, year, week)
+                .map(g -> g.getGoalCount())
+                .orElse(3);
+
+        long completed = todoRepository.countByUserIdAndCompletedTrueAndCompletedAtBetween(userId, weekStart, weekEnd);
+        return completed >= goal;
     }
 
     public List<WeeklyStat> getRecentWeeklyStats(Long userId, int weeks) {

@@ -28,7 +28,8 @@
 
 이벤트 원본을 보존하는 이유:
 - 배치가 실패하거나 스키마가 변경되어도 `todo_events`를 소스로 삼아 전체 stats를 언제든 재계산할 수 있습니다.
-- `DevController /dev/batch/recalculateStats`는 모든 이벤트를 순회하며 stats를 전체 재구성합니다.
+- `POST /dev/batch/recalculateStats`는 `todo_events` 전체를 순회하며 daily_stats → weekly_stats → streak_stats → ranking 순서로 전부 재구성합니다.
+- `todo_events` 자체가 비어있는 경우(초기 운영 또는 데이터 유실)에는 `POST /dev/batch/backfillTodoEvents`로 완료된 todos 기반으로 이벤트를 먼저 채운 뒤 재계산합니다.
 
 ---
 
@@ -87,24 +88,40 @@ completionRate  = completedCount / totalScheduled
 freeze 상태에서 다음 주 목표를 달성하면 streak이 그대로 이어집니다.
 2주 연속 미달성 시에만 streak을 리셋하여 사용자의 누적 기록을 최대한 보존합니다.
 
+**목표 미설정 시 기본값**: 주간 목표를 설정하지 않은 경우 주 3개 완료를 기본 기준으로 적용합니다.
+UI에서 "기본 목표 3개가 적용되고 있어요. 직접 설정하시겠어요?"로 안내합니다.
+
+**활동 없는 주(빈 주) 처리**: 활동이 전혀 없는 주는 `weekly_stats` 레코드가 생성되지 않습니다.
+`rebuildStreakFromHistory` 실행 시 연속된 두 레코드 간 주차 gap을 계산하여 빈 주를 감지합니다.
+
+```
+gap == 2 (빈 주 1개): freeze 유예 소비
+gap >= 3 (빈 주 2개 이상): streak 리셋
+```
+
 ---
 
 ## 기술적 고민 3 — 이번 주 streak 표시
 
 streak_stats는 배치로 갱신되므로 이번 주가 아직 끝나지 않은 상태에서는 현재 주의 활동이 반영되지 않습니다.
-이번 주에 완료한 일정이 있다면 `currentStreak + 1`을 응답에 반영해야 합니다.
+이번 주 목표를 이미 달성했다면 `currentStreak + 1`을 응답에 반영합니다.
+
+단순히 "완료한 이벤트가 있는지"가 아닌 **이번 주 실제 목표 달성 여부**를 기준으로 합니다.
+완료 후 취소해도 `todo_events`에 COMPLETED 이벤트가 남기 때문에 이벤트 존재 여부로 판단하면 오동작합니다.
 
 ```java
 // StatsService
-boolean currentWeekActive = todoEventRepository
-    .existsByUserIdAndEventTypeAndEventDateBetween(userId, "COMPLETED", weekStart, weekEnd);
+int goal = weeklyGoalRepository.findByUserIdAndYearAndWeekNumber(userId, year, week)
+    .map(g -> g.getGoalCount())
+    .orElse(3); // 목표 미설정 시 기본값 3
+
+long completed = todoRepository.countByUserIdAndCompletedTrueAndCompletedAtBetween(userId, weekStart, weekEnd);
+boolean goalAchieved = completed >= goal;
 
 // StreakResponse 생성 시
-this.currentStreak = stat.getCurrentStreak() + (currentWeekActive ? 1 : 0);
+this.currentStreak = stat.getCurrentStreak() + (goalAchieved ? 1 : 0);
 this.longestStreak = Math.max(stat.getLongestStreak(), this.currentStreak);
 ```
-
-DB에서 이번 주 이벤트 존재 여부만 확인하므로 조회 비용이 낮습니다.
 
 ---
 
@@ -123,12 +140,13 @@ DB에서 이번 주 이벤트 존재 여부만 확인하므로 조회 비용이 
 
 ## Journey 달력 연동
 
-Journey 달력은 `daily_stats`를 기반으로 날짜별 완료 건수와 달성률을 시각화합니다.
+Journey 달력은 `todos` 테이블을 직접 조회하여 날짜별 완료 건수를 실시간으로 반환합니다.
+`daily_stats`(배치 집계)를 사용하지 않으므로 완료/취소 즉시 달력에 반영됩니다.
 
 ```
 GET /api/stats/calendar?year=2026&month=4
-  → daily_stats WHERE user_id = ? AND stat_date BETWEEN ? AND ?
-  → 날짜별 completedCount, completionRate 반환
+  → todos WHERE user_id = ? AND completed = true AND completed_at BETWEEN ? AND ?
+  → 날짜별 completedCount 반환
 ```
 
 달력에서 완료 건이 있는 날짜를 클릭하면 Dashboard로 이동하여 해당 날짜의 완료 일정을 하이라이트합니다.
@@ -147,5 +165,5 @@ dashboard-page: completedDate 쿼리 파라미터 → completedTodos에서 compl
 | 실시간 집계 vs 배치 집계 | 배치 — 조회 성능 우선, 통계는 분 단위 지연 허용 |
 | 이벤트 보존 방식 | todo_events 원본 보존 — 언제든 재계산 가능 |
 | 스트릭 리셋 정책 | 1회 freeze 유예 — 사용자 기록 보존 |
-| 이번 주 streak | DB 실시간 조회 + 배치 결과에 +1 — 경량 쿼리로 최신성 보장 |
+| 이번 주 streak | 이번 주 완료 건수 vs 목표 비교 — 목표 달성 시에만 +1 표시 |
 | 목표 설정 시점 | 서버 검증 — 어뷰징 차단 |

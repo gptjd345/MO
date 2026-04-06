@@ -45,6 +45,18 @@ function buildTodoUrl(completed: boolean, page: number, sort: SortOption, search
   return `/api/todos?${params}`;
 }
 
+export function useCompletedPage(completedAt: string | null) {
+  return useQuery<{ page: number }>({
+    queryKey: ["todos", "find-page", completedAt],
+    queryFn: async () => {
+      const res = await fetchWithRefresh(`/api/todos/find-page?completedAt=${completedAt}&size=10`);
+      if (!res.ok) throw new Error("Failed to find page");
+      return res.json();
+    },
+    enabled: !!completedAt,
+  });
+}
+
 export function useActiveTodos(page: number, sort: SortOption, search: string) {
   return useQuery<PagedTodoResponse>({
     queryKey: ["todos", "active", page, sort, search],

@@ -266,18 +266,28 @@ function StreakSection() {
             {displayGoal !== null ? (
               <p className="text-xs text-muted-foreground">주당 {displayGoal}개</p>
             ) : (
-              <p className="text-xs text-muted-foreground/60">목표 미설정</p>
+              <p className="text-xs text-muted-foreground/60">
+                기본 목표 3개가 적용되고 있어요.{" "}
+                {canSetGoal && !showGoalInput && (
+                  <button
+                    className="underline text-muted-foreground/80 hover:text-white transition-colors"
+                    onClick={() => { setShowGoalInput(true); setInputGoal(recommended); }}
+                  >
+                    직접 설정하시겠어요?
+                  </button>
+                )}
+              </p>
             )}
           </div>
 
-          {canSetGoal && !showGoalInput ? (
+          {canSetGoal && !showGoalInput && displayGoal !== null ? (
             <Button
               size="sm"
               variant="outline"
               className="text-xs h-7"
               onClick={() => { setShowGoalInput(true); setInputGoal(displayGoal ?? recommended); }}
             >
-              {displayGoal !== null ? "수정" : "설정"}
+              수정
             </Button>
           ) : canSetGoal ? null : (
             <span className="text-xs text-muted-foreground/50">

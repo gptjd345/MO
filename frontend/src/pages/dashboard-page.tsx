@@ -1,6 +1,6 @@
 import { useState, forwardRef, useEffect } from "react";
 import { useSearch } from "wouter";
-import { useActiveTodos, useCompletedTodos, useTodoMutations, type Todo, type SortOption } from "@/hooks/use-todos";
+import { useActiveTodos, useCompletedTodos, useCompletedPage, useTodoMutations, type Todo, type SortOption } from "@/hooks/use-todos";
 import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -190,6 +190,8 @@ export default function DashboardPage() {
   const search = useSearch();
   const completedDateParam = new URLSearchParams(search).get("completedDate");
 
+  const { data: completedPageData } = useCompletedPage(completedDateParam);
+
   const { data: activeData, isLoading: isActiveLoading } = useActiveTodos(activePage, sortBy, searchQuery);
   const { data: completedData, isLoading: isCompletedLoading } = useCompletedTodos(completedPage, sortBy, searchQuery);
 
@@ -281,8 +283,10 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!completedDateParam) return;
     setHighlightDate(completedDateParam);
-    setCompletedPage(0);
-  }, [completedDateParam]);
+    if (completedPageData !== undefined) {
+      setCompletedPage(completedPageData.page);
+    }
+  }, [completedDateParam, completedPageData]);
 
   const isPro = user?.plan === "PRO";
   const totalTodos = (activeData?.totalCount ?? 0) + (completedData?.totalCount ?? 0);
