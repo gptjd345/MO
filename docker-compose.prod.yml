@@ -39,7 +39,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      start_period: 25s
 
   postgres:
     image: postgres:16-alpine
@@ -82,10 +82,6 @@ services:
       - prometheus_prod_data:/prometheus
     ports:
       - "9090:9090"
-    depends_on:
-      spring:
-        condition: service_healthy
-
   grafana:
     image: grafana/grafana
     restart: always
@@ -103,9 +99,6 @@ services:
     restart: always
     ports:
       - "9091:9091"
-    depends_on:
-      spring:
-        condition: service_healthy
 
 volumes:
   postgres_prod_data:
