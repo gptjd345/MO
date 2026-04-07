@@ -87,6 +87,8 @@ services:
     restart: always
     volumes:
       - grafana_prod_data:/var/lib/grafana
+      - ./monitoring/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana-dashboard.json:/etc/grafana/dashboards/mo-dashboard.json
     ports:
       - "3000:3000"
     environment:
@@ -99,6 +101,22 @@ services:
     restart: always
     ports:
       - "9091:9091"
+
+  node-exporter:
+    image: prom/node-exporter
+    restart: always
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
 
 volumes:
   postgres_prod_data:

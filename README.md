@@ -23,12 +23,13 @@ Client (HTTPS)
             └── /*      ─► S3 (React 정적 빌드)
 
 EC2 (Docker Compose)
-    ├── spring      :8080
-    ├── postgres    :5432
-    ├── redis       :6379
-    ├── prometheus  :9090
-    ├── grafana     :3000
-    └── pushgateway :9091
+    ├── spring         :8080
+    ├── postgres       :5432
+    ├── redis          :6379
+    ├── prometheus     :9090
+    ├── grafana        :3000
+    ├── pushgateway    :9091
+    └── node-exporter  :9100
 ```
 
 CloudFront를 단일 진입점으로 사용해 프론트엔드(S3)와 API(EC2)를 동일 도메인에서 서빙합니다. 클라이언트는 API를 상대 경로(`/api/*`)로 호출하므로 CORS 이슈가 없습니다.
@@ -64,7 +65,11 @@ CloudFront를 단일 진입점으로 사용해 프론트엔드(S3)와 API(EC2)�
 │   ├── pages/                 # auth-page, dashboard-page, calendar-page
 │   ├── components/            # layout-shell, UI 컴포넌트
 │   └── hooks/                 # use-auth, use-todos, use-ranking
-├── monitoring/                # prometheus.yml (prod), prometheus.dev.yml (dev)
+├── monitoring/
+│   ├── prometheus.yml         # prod scrape 설정
+│   ├── prometheus.dev.yml     # dev scrape 설정 (host.docker.internal)
+│   ├── grafana-dashboard.json # 애플리케이션 모니터링 대시보드
+│   └── provisioning/          # Grafana 시작 시 datasource·dashboard 자동 등록
 ├── docs/                      # 설계 문서
 ├── .github/workflows/ci.yml   # GitHub Actions CI/CD
 └── docker-compose.prod.yml

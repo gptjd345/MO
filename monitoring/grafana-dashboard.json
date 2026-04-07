@@ -1,0 +1,285 @@
+{
+  "annotations": {
+    "list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "refresh": "30s",
+  "schemaVersion": 42,
+  "tags": [],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MO 애플리케이션 모니터링",
+  "uid": "mo-app-dashboard",
+  "version": 1,
+  "weekStart": "",
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP 처리량 (req/s)",
+      "description": "actuator 제외한 API 엔드포인트 초당 요청 수",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (method, uri) (rate(http_server_requests_seconds_count{uri!~\"/actuator.*\"}[1m]))",
+          "legendFormat": "{{method}} {{uri}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "spanNulls": false}
+        }
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
+    },
+    {
+      "id": 2,
+      "title": "HTTP 에러율 (4xx/5xx)",
+      "description": "클라이언트 에러(4xx)와 서버 에러(5xx) 비율. 서버 에러가 지속되면 장애 징후",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{outcome=\"CLIENT_ERROR\"}[1m]))",
+          "legendFormat": "4xx",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{outcome=\"SERVER_ERROR\"}[1m]))",
+          "legendFormat": "5xx",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 10}
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "5xx"}, "properties": [{"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}}]},
+          {"matcher": {"id": "byName", "options": "4xx"}, "properties": [{"id": "color", "value": {"fixedColor": "orange", "mode": "fixed"}}]}
+        ]
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
+    },
+    {
+      "id": 3,
+      "title": "배치 성공 여부",
+      "description": "Pushgateway에서 수집. 1=성공, 0=실패. 실패 시 통계/스트릭 데이터가 갱신되지 않음",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "batch_job_success{job=\"dailyStatsJob\"}",
+          "legendFormat": "statsJob",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"type": "value", "options": {"0": {"text": "실패", "color": "red", "index": 0}, "1": {"text": "성공", "color": "green", "index": 1}}}
+          ],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]},
+          "color": {"mode": "thresholds"}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "background"}
+    },
+    {
+      "id": 4,
+      "title": "배치 마지막 실행",
+      "description": "마지막으로 배치가 실행된 시각. 오래됐다면 스케줄러 문제 가능성",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "batch_job_last_run_timestamp_seconds{job=\"dailyStatsJob\"}",
+          "legendFormat": "statsJob",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow",
+          "color": {"mode": "fixed", "fixedColor": "blue"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": 0}]}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "value"}
+    },
+    {
+      "id": 5,
+      "title": "배치 실행 소요 시간 (초)",
+      "description": "배치 완료까지 걸린 시간. 데이터가 늘어날수록 증가할 수 있음",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "batch_job_duration_seconds{job=\"dailyStatsJob\"}",
+          "legendFormat": "statsJob",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {"mode": "palette-classic"},
+          "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 10}
+        }
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "single", "sort": "none"}
+      }
+    },
+    {
+      "id": 6,
+      "title": "JVM 힙 사용률 (%)",
+      "description": "힙 사용률이 지속적으로 증가하면 메모리 누수 또는 OOM 위험 징후",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{area=\"heap\"} / jvm_memory_max_bytes{area=\"heap\"} * 100",
+          "legendFormat": "힙 사용률",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "orange", "value": 70}, {"color": "red", "value": 85}]},
+          "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 20}
+        }
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "single", "sort": "none"}
+      }
+    },
+    {
+      "id": 7,
+      "title": "작업별 실행수",
+      "description": "10분 내 @Scheduled 메서드별 실행 횟수. 실행이 누락되면 스케줄러 이상",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (code_function) (increase(tasks_scheduled_execution_seconds_count[10m]))",
+          "legendFormat": "{{code_function}}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {"mode": "percentage", "steps": [{"color": "green", "value": 0}, {"color": "orange", "value": 70}, {"color": "red", "value": 85}]}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "showThresholdMarkers": true}
+    },
+    {
+      "id": 8,
+      "title": "Scheduled Task 전체 실행 횟수",
+      "description": "메서드별 누적 실행 횟수 추이. 특정 시점에 실행이 멈추면 이상 감지 가능",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (code_function) (increase(tasks_scheduled_execution_seconds_count[10m]))",
+          "legendFormat": "{{code_function}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 0}
+        }
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
+    },
+    {
+      "id": 9,
+      "title": "Scheduled Task 평균 실행 시간",
+      "description": "메서드별 평균 실행 시간. 갑자기 증가하면 DB 쿼리 슬로우 등 성능 문제 징후",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (code_function) (rate(tasks_scheduled_execution_seconds_sum[5m])) / sum by (code_function) (rate(tasks_scheduled_execution_seconds_count[5m]))",
+          "legendFormat": "{{code_function}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {"mode": "palette-classic"},
+          "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 0}
+        }
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
+    },
+    {
+      "id": 10,
+      "title": "Scheduled Task 최대 실행 시간",
+      "description": "메서드별 최대 실행 시간. 이상치가 있으면 특정 실행에서 문제가 발생했음을 의미",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "max by (code_function) (tasks_scheduled_execution_seconds_max)",
+          "legendFormat": "{{code_function}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {"mode": "palette-classic"},
+          "custom": {"drawStyle": "line", "lineWidth": 1, "fillOpacity": 0}
+        }
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "single", "sort": "none"}
+      }
+    }
+  ]
+}
