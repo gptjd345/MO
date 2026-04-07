@@ -26,9 +26,9 @@ public class BatchMetricsPusher {
                 .labelNames("job").register(registry)
                 .labels(jobName).set(durationMs / 1000.0);
 
-        Gauge.build("batch_job_last_run_timestamp_seconds", "Batch job last run Unix timestamp")
+        Gauge.build("batch_job_last_run_timestamp_ms", "Batch job last run Unix timestamp in milliseconds")
                 .labelNames("job").register(registry)
-                .labels(jobName).set(System.currentTimeMillis() / 1000.0);
+                .labels(jobName).set(System.currentTimeMillis());
 
         Gauge.build("batch_job_success", "1 if last batch job succeeded, 0 otherwise")
                 .labelNames("job").register(registry)

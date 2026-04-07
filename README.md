@@ -194,7 +194,7 @@ statsJob (매일 새벽 1시)
 statsJob 완료 → BatchMetricsPusher.push()
   → batch_job_duration_seconds
   → batch_job_success
-  → batch_job_last_run_timestamp_seconds
+  → batch_job_last_run_timestamp_ms
 ```
 
 **스트릭 freeze 정책**

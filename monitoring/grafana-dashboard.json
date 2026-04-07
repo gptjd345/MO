@@ -112,7 +112,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "batch_job_last_run_timestamp_seconds{job=\"dailyStatsJob\"}",
+          "expr": "batch_job_last_run_timestamp_ms{job=\"dailyStatsJob\"}",
           "legendFormat": "statsJob",
           "instant": true,
           "refId": "A"
