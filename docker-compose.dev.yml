@@ -68,7 +68,7 @@ services:
     volumes:
       - grafana_dev_data:/var/lib/grafana
       - ./monitoring/provisioning:/etc/grafana/provisioning
-      - ./monitoring/grafana-dashboard.json:/etc/grafana/dashboards/mo-dashboard.json
+      - ./monitoring/grafana-dashboard.json:/etc/mo-dashboard.json
     ports:
       - "3002:3000"
     environment:
