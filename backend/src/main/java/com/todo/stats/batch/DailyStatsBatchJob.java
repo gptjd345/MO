@@ -1,6 +1,5 @@
 package com.todo.stats.batch;
 
-import com.todo.stats.domain.DailyStat;
 import com.todo.stats.domain.StreakStat;
 import com.todo.stats.domain.TodoEvent;
 import com.todo.stats.domain.WeeklyStat;
@@ -40,7 +39,6 @@ public class DailyStatsBatchJob {
     private final PlatformTransactionManager transactionManager;
     private final JobLauncher jobLauncher;
     private final TodoEventRepository todoEventRepository;
-    private final DailyStatRepository dailyStatRepository;
     private final WeeklyStatRepository weeklyStatRepository;
     private final StreakStatRepository streakStatRepository;
     private final WeeklyGoalRepository weeklyGoalRepository;
@@ -53,7 +51,6 @@ public class DailyStatsBatchJob {
                                PlatformTransactionManager transactionManager,
                                JobLauncher jobLauncher,
                                TodoEventRepository todoEventRepository,
-                               DailyStatRepository dailyStatRepository,
                                WeeklyStatRepository weeklyStatRepository,
                                StreakStatRepository streakStatRepository,
                                WeeklyGoalRepository weeklyGoalRepository,
@@ -62,7 +59,6 @@ public class DailyStatsBatchJob {
         this.transactionManager = transactionManager;
         this.jobLauncher = jobLauncher;
         this.todoEventRepository = todoEventRepository;
-        this.dailyStatRepository = dailyStatRepository;
         this.weeklyStatRepository = weeklyStatRepository;
         this.streakStatRepository = streakStatRepository;
         this.weeklyGoalRepository = weeklyGoalRepository;
@@ -89,88 +85,12 @@ public class DailyStatsBatchJob {
     @Bean
     public Job statsJob() {
         return new JobBuilder("dailyStatsJob", jobRepository)
-                .start(dailyStatsStep())
-                .next(weeklyStatsStep())
+                .start(weeklyStatsStep())
                 .next(streakStatsStep())
                 .build();
     }
 
-    // ─── Step 1: daily_stats 재집계 ───────────────────────────────────────────
-
-    @Bean
-    public Step dailyStatsStep() {
-        return new StepBuilder("dailyStatsStep", jobRepository)
-                .tasklet((contribution, chunkContext) -> {
-                    LocalDate yesterday = LocalDate.now().minusDays(1);
-                    LocalDateTime from = yesterday.atStartOfDay();
-                    LocalDateTime to = LocalDate.now().atStartOfDay();
-
-                    List<TodoEvent> events = todoEventRepository.findByCreatedAtBetween(from, to);
-                    if (events.isEmpty()) return RepeatStatus.FINISHED;
-
-                    // 영향받는 (userId, statDate) 쌍 수집
-                    Set<String> pairs = events.stream()
-                            .map(e -> e.getUserId() + ":" + e.getEventDate())
-                            .collect(Collectors.toSet());
-
-                    for (String pair : pairs) {
-                        String[] parts = pair.split(":");
-                        Long userId = Long.parseLong(parts[0]);
-                        LocalDate statDate = LocalDate.parse(parts[1]);
-                        recomputeDailyStat(userId, statDate);
-                    }
-
-                    log.info("daily_stats recomputed for {} (userId, date) pairs", pairs.size());
-                    return RepeatStatus.FINISHED;
-                }, transactionManager)
-                .build();
-    }
-
-    public void recomputeDailyStat(Long userId, LocalDate date) {
-        // 분자: date에 완료한 todo 수
-        Long completedCount = (Long) entityManager.createQuery(
-                "SELECT COUNT(t) FROM Todo t WHERE t.userId = :userId AND t.completedAt = :date")
-                .setParameter("userId", userId)
-                .setParameter("date", date)
-                .getSingleResult();
-
-        // 분모: (마감일 = date이고 미완료) + (마감일 != date이고 date에 완료)
-        Long scheduledCount = (Long) entityManager.createQuery(
-                "SELECT COUNT(t) FROM Todo t WHERE t.userId = :userId AND (" +
-                "  (t.endDate = :date AND t.completedAt IS NULL) OR " +
-                "  (t.completedAt = :date AND (t.endDate IS NULL OR t.endDate != :date))" +
-                ")")
-                .setParameter("userId", userId)
-                .setParameter("date", date)
-                .getSingleResult();
-
-        // 마감일 = date인데 date에 완료한 경우는 분모에 한 번만 들어가야 함 (위 쿼리에서 두 번 카운트되지 않음)
-        // 단, 마감일 = date이고 date에 완료한 경우를 분모에 추가
-        Long onTimeDoneCount = (Long) entityManager.createQuery(
-                "SELECT COUNT(t) FROM Todo t WHERE t.userId = :userId " +
-                "AND t.endDate = :date AND t.completedAt = :date")
-                .setParameter("userId", userId)
-                .setParameter("date", date)
-                .getSingleResult();
-
-        long totalScheduled = scheduledCount + onTimeDoneCount;
-        double rate = totalScheduled > 0 ? (double) completedCount / totalScheduled : 0.0;
-
-        DailyStat stat = dailyStatRepository.findByUserIdAndStatDate(userId, date)
-                .orElseGet(() -> {
-                    DailyStat s = new DailyStat();
-                    s.setUserId(userId);
-                    s.setStatDate(date);
-                    return s;
-                });
-
-        stat.setCompletedCount(completedCount.intValue());
-        stat.setScheduledCount((int) totalScheduled);
-        stat.setCompletionRate(rate);
-        dailyStatRepository.save(stat);
-    }
-
-    // ─── Step 2: weekly_stats 재집계 ─────────────────────────────────────────
+    // ─── Step 1: weekly_stats 재집계 ─────────────────────────────────────────
 
     @Bean
     public Step weeklyStatsStep() {
@@ -208,19 +128,27 @@ public class DailyStatsBatchJob {
     }
 
     public void recomputeWeeklyStat(Long userId, int year, int weekNumber) {
-        // 해당 주의 daily_stats 합산
-        // ISO 주: 월요일 시작
         LocalDate weekStart = LocalDate.now()
                 .with(IsoFields.WEEK_BASED_YEAR, year)
                 .with(IsoFields.WEEK_OF_WEEK_BASED_YEAR, weekNumber)
                 .with(DayOfWeek.MONDAY);
         LocalDate weekEnd = weekStart.plusDays(6);
 
-        List<DailyStat> dailyStats = dailyStatRepository.findByUserIdAndDateRange(userId, weekStart, weekEnd);
+        // todos 테이블에서 직접 해당 주 완료 건수 집계
+        Long completedCount = (Long) entityManager.createQuery(
+                "SELECT COUNT(t) FROM Todo t WHERE t.userId = :userId " +
+                "AND t.completedAt BETWEEN :weekStart AND :weekEnd")
+                .setParameter("userId", userId)
+                .setParameter("weekStart", weekStart)
+                .setParameter("weekEnd", weekEnd)
+                .getSingleResult();
 
-        int totalCompleted = dailyStats.stream().mapToInt(DailyStat::getCompletedCount).sum();
-        int totalScheduled = dailyStats.stream().mapToInt(DailyStat::getScheduledCount).sum();
-        double rate = totalScheduled > 0 ? (double) totalCompleted / totalScheduled : 0.0;
+        int totalCompleted = completedCount.intValue();
+
+        boolean achieved = weeklyGoalRepository
+                .findByUserIdAndYearAndWeekNumber(userId, year, weekNumber)
+                .map(goal -> totalCompleted >= goal.getGoalCount())
+                .orElse(totalCompleted >= 3);
 
         WeeklyStat stat = weeklyStatRepository.findByUserIdAndYearAndWeekNumber(userId, year, weekNumber)
                 .orElseGet(() -> {
@@ -232,14 +160,6 @@ public class DailyStatsBatchJob {
                 });
 
         stat.setCompletedCount(totalCompleted);
-        stat.setScheduledCount(totalScheduled);
-        stat.setCompletionRate(rate);
-
-        // goal_achieved 체크
-        boolean achieved = weeklyGoalRepository
-                .findByUserIdAndYearAndWeekNumber(userId, year, weekNumber)
-                .map(goal -> totalCompleted >= goal.getGoalCount())
-                .orElse(totalCompleted >= 3);
         stat.setGoalAchieved(achieved);
         stat.setUpdatedAt(LocalDateTime.now());
         weeklyStatRepository.save(stat);

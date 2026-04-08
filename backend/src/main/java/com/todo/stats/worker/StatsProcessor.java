@@ -1,18 +1,16 @@
 package com.todo.stats.worker;
 
-import com.todo.stats.domain.DailyStat;
 import com.todo.stats.domain.WeeklyStat;
-import com.todo.stats.infrastructure.DailyStatRepository;
 import com.todo.stats.infrastructure.StatsStreamPublisher;
 import com.todo.stats.infrastructure.WeeklyGoalRepository;
 import com.todo.stats.infrastructure.WeeklyStatRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.IsoFields;
 import java.util.Map;
@@ -22,58 +20,28 @@ public class StatsProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(StatsProcessor.class);
 
-    private final DailyStatRepository dailyStatRepository;
     private final WeeklyStatRepository weeklyStatRepository;
     private final WeeklyGoalRepository weeklyGoalRepository;
     private final StringRedisTemplate redisTemplate;
 
-    public StatsProcessor(DailyStatRepository dailyStatRepository,
-                          WeeklyStatRepository weeklyStatRepository,
+    public StatsProcessor(WeeklyStatRepository weeklyStatRepository,
                           WeeklyGoalRepository weeklyGoalRepository,
                           StringRedisTemplate redisTemplate) {
-        this.dailyStatRepository = dailyStatRepository;
         this.weeklyStatRepository = weeklyStatRepository;
         this.weeklyGoalRepository = weeklyGoalRepository;
         this.redisTemplate = redisTemplate;
     }
 
-    public void processDailyStats(MapRecord<String, Object, Object> message) {
-        try {
-            Map<Object, Object> body = message.getValue();
-            Object rawType = body.get("eventType");
-            if (rawType == null || !"COMPLETED".equals(rawType.toString())) return;
-
-            Long userId = Long.parseLong(body.get("userId").toString());
-            LocalDate eventDate = LocalDate.parse(body.get("eventDate").toString());
-
-            DailyStat stat = dailyStatRepository.findByUserIdAndStatDate(userId, eventDate)
-                    .orElseGet(() -> {
-                        DailyStat s = new DailyStat();
-                        s.setUserId(userId);
-                        s.setStatDate(eventDate);
-                        return s;
-                    });
-
-            stat.setCompletedCount(stat.getCompletedCount() + 1);
-            stat.setScheduledCount(stat.getScheduledCount() + 1);
-            if (stat.getScheduledCount() > 0) {
-                stat.setCompletionRate((double) stat.getCompletedCount() / stat.getScheduledCount());
-            }
-            dailyStatRepository.save(stat);
-
-        } catch (Exception e) {
-            log.error("Failed to process daily stats messageId={}", message.getId(), e);
-        } finally {
-            redisTemplate.opsForStream().acknowledge(
-                    message.getStream(), StatsStreamPublisher.STATS_GROUP, message.getId());
-        }
-    }
-
     public void processWeeklyStats(MapRecord<String, Object, Object> message) {
         try {
             Map<Object, Object> body = message.getValue();
-            Object rawType = body.get("eventType");
-            if (rawType == null || !"COMPLETED".equals(rawType.toString())) return;
+            String eventType = body.get("eventType") != null ? body.get("eventType").toString() : null;
+
+            // 처리 대상이 아닌 이벤트(INIT 등)는 즉시 ACK
+            if (!"COMPLETED".equals(eventType) && !"UNCOMPLETED".equals(eventType)) {
+                ack(message.getStream(), StatsStreamPublisher.WEEKLY_GROUP, message.getId());
+                return;
+            }
 
             Long userId = Long.parseLong(body.get("userId").toString());
             LocalDate eventDate = LocalDate.parse(body.get("eventDate").toString());
@@ -90,24 +58,34 @@ public class StatsProcessor {
                         return s;
                     });
 
-            stat.setCompletedCount(stat.getCompletedCount() + 1);
-            stat.setScheduledCount(stat.getScheduledCount() + 1);
-            if (stat.getScheduledCount() > 0) {
-                stat.setCompletionRate((double) stat.getCompletedCount() / stat.getScheduledCount());
+            if ("COMPLETED".equals(eventType)) {
+                stat.setCompletedCount(stat.getCompletedCount() + 1);
+            } else {
+                stat.setCompletedCount(Math.max(0, stat.getCompletedCount() - 1));
             }
 
-            // goal_achieved 체크
-            weeklyGoalRepository.findByUserIdAndYearAndWeekNumber(userId, year, weekNumber)
-                    .ifPresent(goal -> stat.setGoalAchieved(stat.getCompletedCount() >= goal.getGoalCount()));
-
+            // goalAchieved 재평가
+            int goal = weeklyGoalRepository.findByUserIdAndYearAndWeekNumber(userId, year, weekNumber)
+                    .map(g -> g.getGoalCount())
+                    .orElse(3);
+            stat.setGoalAchieved(stat.getCompletedCount() >= goal);
             stat.setUpdatedAt(java.time.LocalDateTime.now());
             weeklyStatRepository.save(stat);
 
+            // DB 저장 성공 후에만 ACK
+            ack(message.getStream(), StatsStreamPublisher.WEEKLY_GROUP, message.getId());
+
         } catch (Exception e) {
-            log.error("Failed to process weekly stats messageId={}", message.getId(), e);
-        } finally {
-            redisTemplate.opsForStream().acknowledge(
-                    message.getStream(), StatsStreamPublisher.WEEKLY_GROUP, message.getId());
+            // 의도적으로 ACK 하지 않음 — PEL에 남아 retryPending()에서 재처리됨
+            log.error("Failed to process weekly stats messageId={} — leaving in PEL for retry", message.getId(), e);
+        }
+    }
+
+    private void ack(String stream, String group, RecordId id) {
+        try {
+            redisTemplate.opsForStream().acknowledge(stream, group, id);
+        } catch (Exception e) {
+            log.warn("ACK failed stream={} group={} messageId={}: {}", stream, group, id, e.getMessage());
         }
     }
 }

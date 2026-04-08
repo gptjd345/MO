@@ -79,15 +79,6 @@ public class DevController {
     public ResponseEntity<String> runRecalculateStats() {
         List<TodoEvent> allEvents = todoEventRepository.findAll();
 
-        // daily_stats 재계산
-        Set<String> dailyPairs = allEvents.stream()
-                .map(e -> e.getUserId() + ":" + e.getEventDate())
-                .collect(Collectors.toSet());
-        for (String pair : dailyPairs) {
-            String[] parts = pair.split(":");
-            dailyStatsBatchJob.recomputeDailyStat(Long.parseLong(parts[0]), LocalDate.parse(parts[1]));
-        }
-
         // weekly_stats 재계산
         Set<String> weeklyTriples = allEvents.stream()
                 .map(e -> {
@@ -111,8 +102,8 @@ public class DevController {
 
         rankingRebuildJob.rebuild();
         return ResponseEntity.ok(String.format(
-                "전체 stats recalculate 완료 — daily: %d건, weekly: %d건, streak: %d명, ranking 재구성",
-                dailyPairs.size(), weeklyTriples.size(), userIds.size()));
+                "전체 stats recalculate 완료 — weekly: %d건, streak: %d명, ranking 재구성",
+                weeklyTriples.size(), userIds.size()));
     }
 
 

@@ -36,9 +36,13 @@ public class StatsController {
 
     @GetMapping("/streak")
     public ResponseEntity<StreakResponse> getStreak(@AuthenticationPrincipal User user) {
+        int completed = statsService.getCurrentWeekCompleted(user.getId());
+        int goal = statsService.getCurrentWeekGoal(user.getId());
         return ResponseEntity.ok(new StreakResponse(
                 statsService.getStreak(user.getId()),
-                statsService.isCurrentWeekGoalAchieved(user.getId())));
+                completed >= goal,
+                completed,
+                goal));
     }
 
     @GetMapping("/yearly")
@@ -50,14 +54,19 @@ public class StatsController {
         return ResponseEntity.ok(statsService.getYearlyCalendar(user.getId(), y));
     }
 
+    @GetMapping("/daily")
+    public ResponseEntity<List<CalendarDayResponse>> getDaily(
+            @RequestParam(defaultValue = "6") int days,
+            @AuthenticationPrincipal User user) {
+
+        return ResponseEntity.ok(statsService.getRecentDailyStats(user.getId(), days));
+    }
+
     @GetMapping("/weekly")
     public ResponseEntity<List<WeeklyStatResponse>> getWeekly(
             @RequestParam(defaultValue = "8") int weeks,
             @AuthenticationPrincipal User user) {
 
-        List<WeeklyStatResponse> result = statsService.getRecentWeeklyStats(user.getId(), weeks)
-                .stream().map(WeeklyStatResponse::new).toList();
-
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(statsService.getCalendarWeeklyStats(user.getId(), weeks));
     }
 }

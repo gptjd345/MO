@@ -187,6 +187,8 @@ public class TodoService {
         List<Todo> todos = todoRepository.findAllById(request.getIds());
         int totalPointsDeducted = 0;
 
+        List<long[]> undonePairs = new java.util.ArrayList<>(); // [todoId, completedAt]
+
         for (Todo todo : todos) {
             if (!todo.getUserId().equals(userId)) continue;
             if (!todo.isCompleted()) continue;
@@ -200,6 +202,7 @@ public class TodoService {
 
             if (originalCompletedAt != null) {
                 recordTodoEvent(userId, todo.getId(), "CANCELLED", originalCompletedAt);
+                undonePairs.add(new long[]{todo.getId(), originalCompletedAt.toEpochDay()});
             }
         }
 
@@ -217,20 +220,25 @@ public class TodoService {
             }
         }
 
+        for (long[] pair : undonePairs) {
+            try {
+                statsStreamPublisher.publishUncompleted(userId, pair[0], LocalDate.ofEpochDay(pair[1]));
+            } catch (Exception e) {
+                log.warn("Stats uncompleted event publish failed for todoId={}: {}", pair[0], e.getMessage());
+            }
+        }
+
         return totalPointsDeducted;
     }
 
+    // 트랜잭션 내에서 호출할 것. 예외 발생 시 상위 트랜잭션이 롤백되어야 함.
     private void recordTodoEvent(Long userId, Long todoId, String eventType, LocalDate eventDate) {
-        try {
-            TodoEvent event = new TodoEvent();
-            event.setUserId(userId);
-            event.setTodoId(todoId);
-            event.setEventType(eventType);
-            event.setEventDate(eventDate);
-            todoEventRepository.save(event);
-        } catch (Exception e) {
-            log.warn("TodoEvent record failed todoId={} type={}: {}", todoId, eventType, e.getMessage());
-        }
+        TodoEvent event = new TodoEvent();
+        event.setUserId(userId);
+        event.setTodoId(todoId);
+        event.setEventType(eventType);
+        event.setEventDate(eventDate);
+        todoEventRepository.save(event);
     }
 
     private int calculatePoints(Todo todo) {

@@ -27,15 +27,6 @@ erDiagram
         BIGINT user_id FK
     }
 
-    daily_stats {
-        BIGSERIAL id PK
-        BIGINT user_id FK
-        DATE stat_date
-        INTEGER completed_count
-        INTEGER scheduled_count
-        FLOAT completion_rate
-    }
-
     weekly_stats {
         BIGSERIAL id PK
         BIGINT user_id FK
@@ -61,7 +52,7 @@ erDiagram
         BIGSERIAL id PK
         BIGINT user_id FK
         BIGINT todo_id
-        VARCHAR event_type "COMPLETED | CANCELLED"
+        VARCHAR event_type "COMPLETED | CANCELLED | UNCOMPLETED"
         DATE event_date
         TIMESTAMP created_at
     }
@@ -98,7 +89,6 @@ erDiagram
     users ||--o{ todos : "작성"
     users ||--o{ payments : "결제"
     users ||--o{ refresh_tokens : "발급"
-    users ||--o{ daily_stats : "집계"
     users ||--o{ weekly_stats : "집계"
     users ||--o| streak_stats : "스트릭"
     users ||--o{ todo_events : "이벤트"
@@ -131,9 +121,8 @@ stats 관련 테이블은 **배치 집계 결과를 저장하는 read-optimized 
 
 | 테이블 | 설계 의도 |
 |--------|-----------|
-| `todo_events` | 완료(`COMPLETED`)/취소(`CANCELLED`) 이벤트를 원본 그대로 보존합니다. 배치가 이 테이블을 소스로 삼아 stats를 재계산합니다. |
-| `daily_stats` | 날짜별 완료 수, 예정 수, 달성률을 사전 집계합니다. Journey 달력 표시에 사용됩니다. |
-| `weekly_stats` | 주별 집계 및 주간 목표 달성 여부(`goal_achieved`)를 저장합니다. |
+| `todo_events` | 완료(`COMPLETED`)/취소(`CANCELLED`)/실행취소(`UNCOMPLETED`) 이벤트를 원본 그대로 보존합니다. 배치가 이 테이블을 소스로 삼아 stats를 재계산합니다. |
+| `weekly_stats` | 주별 완료 수와 주간 목표 달성 여부(`goal_achieved`)를 저장합니다. Redis Streams `weekly-group` 컨슈머가 실시간으로 갱신하고, 배치가 매일 새벽 재계산하여 최종 일관성을 보장합니다. |
 | `streak_stats` | 주간 목표 연속 달성 횟수를 관리합니다. 1회 미달성 시 즉시 리셋하지 않고 `is_freezed`로 유예를 주는 freeze 정책을 적용합니다. |
 | `weekly_goals` | `(user_id, year, week_number)` 복합 유니크로 주차별 목표를 관리합니다. 당일 월요일 또는 전주 일요일에만 설정 가능하도록 서버에서 제한합니다. |
 
