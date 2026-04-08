@@ -12,6 +12,8 @@ export interface StreakData {
   isFreezed: boolean;
   lastWeekAchieved: number | null;
   lastYearAchieved: number | null;
+  currentWeekCompleted: number;
+  currentWeekGoal: number;
 }
 
 export interface WeeklyStatData {
@@ -60,6 +62,17 @@ export function useStreak() {
     queryFn: async () => {
       const res = await fetchWithRefresh("/api/stats/streak");
       if (!res.ok) throw new Error("Failed to fetch streak");
+      return res.json();
+    },
+  });
+}
+
+export function useDailyStats(days = 6) {
+  return useQuery<CalendarDay[]>({
+    queryKey: ["stats", "daily", days],
+    queryFn: async () => {
+      const res = await fetchWithRefresh(`/api/stats/daily?days=${days}`);
+      if (!res.ok) throw new Error("Failed to fetch daily stats");
       return res.json();
     },
   });

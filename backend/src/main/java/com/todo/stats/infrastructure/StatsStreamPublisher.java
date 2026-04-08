@@ -15,7 +15,6 @@ public class StatsStreamPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(StatsStreamPublisher.class);
     public static final String STREAM_KEY = "stats:events";
-    public static final String STATS_GROUP = "stats-group";
     public static final String WEEKLY_GROUP = "weekly-group";
 
     private final StringRedisTemplate redisTemplate;
@@ -25,13 +24,21 @@ public class StatsStreamPublisher {
     }
 
     public void publishCompleted(Long userId, Long todoId, LocalDate completedAt) {
+        publish("COMPLETED", userId, todoId, completedAt);
+    }
+
+    public void publishUncompleted(Long userId, Long todoId, LocalDate completedAt) {
+        publish("UNCOMPLETED", userId, todoId, completedAt);
+    }
+
+    private void publish(String eventType, Long userId, Long todoId, LocalDate eventDate) {
         redisTemplate.opsForStream().add(
                 StreamRecords.newRecord()
                         .ofMap(Map.of(
-                                "eventType", "COMPLETED",
+                                "eventType", eventType,
                                 "userId", userId.toString(),
                                 "todoId", todoId.toString(),
-                                "eventDate", completedAt.toString()
+                                "eventDate", eventDate.toString()
                         ))
                         .withStreamKey(STREAM_KEY)
         );
@@ -39,7 +46,6 @@ public class StatsStreamPublisher {
 
     public void initConsumerGroups() {
         ensureStreamExists();
-        initGroup(STATS_GROUP);
         initGroup(WEEKLY_GROUP);
     }
 
