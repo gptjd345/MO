@@ -14,7 +14,7 @@
     ↓
 todo_events INSERT  ←── source of truth (PostgreSQL, 영속)
     ↓
-Redis Streams (stats:events)
+Redis Streams (todo:events)
     ├── ranking-group  → Redis ZSET 실시간 업데이트
     └── weekly-group   → weekly_stats 실시간 업데이트
 

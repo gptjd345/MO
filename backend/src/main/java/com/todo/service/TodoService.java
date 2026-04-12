@@ -8,11 +8,10 @@ import com.todo.entity.Todo;
 import com.todo.entity.User;
 import com.todo.exception.CustomException;
 import com.todo.exception.ErrorCode;
-import com.todo.ranking.infrastructure.RedisStreamConsumer;
 import com.todo.repository.TodoRepository;
 import com.todo.repository.UserRepository;
 import com.todo.stats.domain.TodoEvent;
-import com.todo.stats.infrastructure.StatsStreamPublisher;
+import com.todo.publisher.TodoEventPublisher;
 import com.todo.stats.infrastructure.TodoEventRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.slf4j.Logger;
@@ -36,20 +35,17 @@ public class TodoService {
 
     private final TodoRepository todoRepository;
     private final UserRepository userRepository;
-    private final RedisStreamConsumer redisStreamConsumer;
     private final TodoEventRepository todoEventRepository;
-    private final StatsStreamPublisher statsStreamPublisher;
+    private final TodoEventPublisher todoEventPublisher;
 
     public TodoService(TodoRepository todoRepository,
                        UserRepository userRepository,
-                       RedisStreamConsumer redisStreamConsumer,
                        TodoEventRepository todoEventRepository,
-                       StatsStreamPublisher statsStreamPublisher) {
+                       TodoEventPublisher todoEventPublisher) {
         this.todoRepository = todoRepository;
         this.userRepository = userRepository;
-        this.redisStreamConsumer = redisStreamConsumer;
         this.todoEventRepository = todoEventRepository;
-        this.statsStreamPublisher = statsStreamPublisher;
+        this.todoEventPublisher = todoEventPublisher;
     }
 
     public List<Todo> getTodos(Long userId) {
@@ -158,22 +154,16 @@ public class TodoService {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
             user.setScore(user.getScore() + totalPoints);
-            user.setRankingVersion(user.getRankingVersion() + 1);
             userRepository.save(user);
 
-            try {
-                redisStreamConsumer.publish(userId, user.getScore(), user.getRankingVersion());
-            } catch (Exception e) {
-                log.warn("Ranking event publish failed for userId={}: {}", userId, e.getMessage());
-            }
-        }
-
-        // 이번 배치에서 새로 완료된 건만 stats 이벤트 발행
-        for (Long todoId : newlyCompletedIds) {
-            try {
-                statsStreamPublisher.publishCompleted(userId, todoId, today);
-            } catch (Exception e) {
-                log.warn("Stats event publish failed for todoId={}: {}", todoId, e.getMessage());
+            // 단일 이벤트를 todo:events 스트림에 발행
+            // weekly-group(주간통계)과 ranking-group(랭킹)이 동일 이벤트를 독립적으로 소비
+            for (Long todoId : newlyCompletedIds) {
+                try {
+                    todoEventPublisher.publishCompleted(userId, todoId, today);
+                } catch (Exception e) {
+                    log.warn("Event publish failed for todoId={}: {}", todoId, e.getMessage());
+                }
             }
         }
 
@@ -210,21 +200,15 @@ public class TodoService {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
             user.setScore(Math.max(0, user.getScore() - totalPointsDeducted));
-            user.setRankingVersion(user.getRankingVersion() + 1);
             userRepository.save(user);
 
-            try {
-                redisStreamConsumer.publish(userId, user.getScore(), user.getRankingVersion());
-            } catch (Exception e) {
-                log.warn("Ranking event publish failed for userId={}: {}", userId, e.getMessage());
-            }
-        }
-
-        for (long[] pair : undonePairs) {
-            try {
-                statsStreamPublisher.publishUncompleted(userId, pair[0], LocalDate.ofEpochDay(pair[1]));
-            } catch (Exception e) {
-                log.warn("Stats uncompleted event publish failed for todoId={}: {}", pair[0], e.getMessage());
+            for (long[] pair : undonePairs) {
+                try {
+                    todoEventPublisher.publishUncompleted(
+                            userId, pair[0], LocalDate.ofEpochDay(pair[1]));
+                } catch (Exception e) {
+                    log.warn("Event publish failed for todoId={}: {}", pair[0], e.getMessage());
+                }
             }
         }
 

@@ -1,6 +1,6 @@
 package com.todo.stats.worker;
 
-import com.todo.stats.infrastructure.StatsStreamPublisher;
+import com.todo.publisher.TodoEventPublisher;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,11 +27,11 @@ public class StatsWorker {
     private static final Duration IDLE_THRESHOLD = Duration.ofSeconds(30);
     private static final long MAX_DELIVERY_COUNT = 3;
 
-    private final StatsStreamPublisher statsStreamPublisher;
+    private final TodoEventPublisher statsStreamPublisher;
     private final StatsProcessor statsProcessor;
     private final StringRedisTemplate redisTemplate;
 
-    public StatsWorker(StatsStreamPublisher statsStreamPublisher,
+    public StatsWorker(TodoEventPublisher statsStreamPublisher,
                        StatsProcessor statsProcessor,
                        StringRedisTemplate redisTemplate) {
         this.statsStreamPublisher = statsStreamPublisher;
@@ -49,9 +49,9 @@ public class StatsWorker {
     public void pollWeeklyStats() {
         try {
             List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream()
-                    .read(Consumer.from(StatsStreamPublisher.WEEKLY_GROUP, "weekly-consumer"),
+                    .read(Consumer.from(TodoEventPublisher.WEEKLY_GROUP, "weekly-consumer"),
                             StreamReadOptions.empty().count(BATCH_SIZE),
-                            StreamOffset.create(StatsStreamPublisher.STREAM_KEY, ReadOffset.lastConsumed()));
+                            StreamOffset.create(TodoEventPublisher.STREAM_KEY, ReadOffset.lastConsumed()));
 
             if (records == null || records.isEmpty()) return;
             for (MapRecord<String, Object, Object> record : records) {
@@ -67,7 +67,7 @@ public class StatsWorker {
 
     @Scheduled(fixedDelay = 60_000)
     public void retryPendingWeeklyStats() {
-        retryPending(StatsStreamPublisher.WEEKLY_GROUP, "weekly-consumer",
+        retryPending(TodoEventPublisher.WEEKLY_GROUP, "weekly-consumer",
                 statsProcessor::processWeeklyStats);
     }
 
@@ -76,7 +76,7 @@ public class StatsWorker {
                               java.util.function.Consumer<MapRecord<String, Object, Object>> processor) {
         try {
             PendingMessages pending = redisTemplate.opsForStream().pending(
-                    StatsStreamPublisher.STREAM_KEY, group,
+                    TodoEventPublisher.STREAM_KEY, group,
                     Range.unbounded(), BATCH_SIZE);
 
             if (pending == null || !pending.iterator().hasNext()) return;
@@ -88,13 +88,13 @@ public class StatsWorker {
                     log.error("Poison pill abandoned: group={} messageId={} deliveries={}",
                             group, msg.getId(), msg.getTotalDeliveryCount());
                     redisTemplate.opsForStream().acknowledge(
-                            StatsStreamPublisher.STREAM_KEY, group, msg.getId());
+                            TodoEventPublisher.STREAM_KEY, group, msg.getId());
                     continue;
                 }
 
                 List<MapRecord<String, Object, Object>> claimed =
                         (List<MapRecord<String, Object, Object>>) (List<?>) redisTemplate.opsForStream()
-                                .claim(StatsStreamPublisher.STREAM_KEY, group, consumerName,
+                                .claim(TodoEventPublisher.STREAM_KEY, group, consumerName,
                                         IDLE_THRESHOLD, msg.getId());
 
                 if (claimed != null) {

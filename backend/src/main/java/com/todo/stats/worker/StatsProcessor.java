@@ -1,7 +1,7 @@
 package com.todo.stats.worker;
 
 import com.todo.stats.domain.WeeklyStat;
-import com.todo.stats.infrastructure.StatsStreamPublisher;
+import com.todo.publisher.TodoEventPublisher;
 import com.todo.stats.infrastructure.WeeklyGoalRepository;
 import com.todo.stats.infrastructure.WeeklyStatRepository;
 import org.slf4j.Logger;
@@ -39,7 +39,7 @@ public class StatsProcessor {
 
             // 처리 대상이 아닌 이벤트(INIT 등)는 즉시 ACK
             if (!"COMPLETED".equals(eventType) && !"UNCOMPLETED".equals(eventType)) {
-                ack(message.getStream(), StatsStreamPublisher.WEEKLY_GROUP, message.getId());
+                ack(message.getStream(), TodoEventPublisher.WEEKLY_GROUP, message.getId());
                 return;
             }
 
@@ -73,7 +73,7 @@ public class StatsProcessor {
             weeklyStatRepository.save(stat);
 
             // DB 저장 성공 후에만 ACK
-            ack(message.getStream(), StatsStreamPublisher.WEEKLY_GROUP, message.getId());
+            ack(message.getStream(), TodoEventPublisher.WEEKLY_GROUP, message.getId());
 
         } catch (Exception e) {
             // 의도적으로 ACK 하지 않음 — PEL에 남아 retryPending()에서 재처리됨

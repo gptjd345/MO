@@ -2,7 +2,7 @@ package com.todo.stats.worker;
 
 import com.todo.stats.domain.WeeklyGoal;
 import com.todo.stats.domain.WeeklyStat;
-import com.todo.stats.infrastructure.StatsStreamPublisher;
+import com.todo.publisher.TodoEventPublisher;
 import com.todo.stats.infrastructure.WeeklyGoalRepository;
 import com.todo.stats.infrastructure.WeeklyStatRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,7 +70,7 @@ class StatsProcessorTest {
         @SuppressWarnings("unchecked")
         MapRecord<String, Object, Object> record = mock(MapRecord.class);
         when(record.getValue()).thenReturn(body);
-        when(record.getStream()).thenReturn(StatsStreamPublisher.STREAM_KEY);
+        when(record.getStream()).thenReturn(TodoEventPublisher.STREAM_KEY);
         when(record.getId()).thenReturn(RecordId.of("1-0"));
         return record;
     }
@@ -99,7 +99,7 @@ class StatsProcessorTest {
 
         @Test
         @DisplayName("weeklyStatRepository.save()가 예외를 던지면 ACK를 보내지 않는다")
-        void save_실패_시_ack_미발행() {
+        void shouldNotAck_whenSaveFails() {
             // given
             when(weeklyStatRepository.findByUserIdAndYearAndWeekNumber(any(), anyInt(), anyInt()))
                     .thenReturn(Optional.of(existingStat(2, false)));
@@ -117,17 +117,18 @@ class StatsProcessorTest {
         }
 
         @Test
-        @DisplayName("처리 대상이 아닌 이벤트(INIT)는 저장 없이 즉시 ACK한다")
-        void init_이벤트는_즉시_ack() {
+        @DisplayName("처리 대상이 아닌 이벤트는 저장 없이 즉시 ACK한다")
+        void shouldAckImmediately_whenEventIsNotSupported() {
             // when
+            // INIT 는 처리대상이 아닌 이벤트를 의미함
             statsProcessor.processWeeklyStats(record("INIT", 1L));
 
             // then
             // DB 저장 없이 ACK만 발행되어야 한다
             verify(weeklyStatRepository, never()).save(any());
             verify(streamOperations).acknowledge(
-                    eq(StatsStreamPublisher.STREAM_KEY),
-                    eq(StatsStreamPublisher.WEEKLY_GROUP),
+                    eq(TodoEventPublisher.STREAM_KEY),
+                    eq(TodoEventPublisher.WEEKLY_GROUP),
                     any(RecordId.class));
         }
     }
@@ -258,8 +259,8 @@ class StatsProcessorTest {
             // then
             verify(streamOperations, times(1))
                     .acknowledge(
-                            eq(StatsStreamPublisher.STREAM_KEY),
-                            eq(StatsStreamPublisher.WEEKLY_GROUP),
+                            eq(TodoEventPublisher.STREAM_KEY),
+                            eq(TodoEventPublisher.WEEKLY_GROUP),
                             any(RecordId.class));
         }
     }

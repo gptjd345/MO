@@ -1,4 +1,4 @@
-package com.todo.stats.infrastructure;
+package com.todo.publisher;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,24 +11,26 @@ import java.time.LocalDate;
 import java.util.Map;
 
 @Component
-public class StatsStreamPublisher {
+public class TodoEventPublisher {
 
-    private static final Logger log = LoggerFactory.getLogger(StatsStreamPublisher.class);
-    public static final String STREAM_KEY = "stats:events";
+    private static final Logger log = LoggerFactory.getLogger(TodoEventPublisher.class);
+
+    public static final String STREAM_KEY = "todo:events";
     public static final String WEEKLY_GROUP = "weekly-group";
+    public static final String RANKING_GROUP = "ranking-group";
 
     private final StringRedisTemplate redisTemplate;
 
-    public StatsStreamPublisher(StringRedisTemplate redisTemplate) {
+    public TodoEventPublisher(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
 
-    public void publishCompleted(Long userId, Long todoId, LocalDate completedAt) {
-        publish("COMPLETED", userId, todoId, completedAt);
+    public void publishCompleted(Long userId, Long todoId, LocalDate eventDate) {
+        publish("COMPLETED", userId, todoId, eventDate);
     }
 
-    public void publishUncompleted(Long userId, Long todoId, LocalDate completedAt) {
-        publish("UNCOMPLETED", userId, todoId, completedAt);
+    public void publishUncompleted(Long userId, Long todoId, LocalDate eventDate) {
+        publish("UNCOMPLETED", userId, todoId, eventDate);
     }
 
     private void publish(String eventType, Long userId, Long todoId, LocalDate eventDate) {
@@ -36,8 +38,8 @@ public class StatsStreamPublisher {
                 StreamRecords.newRecord()
                         .ofMap(Map.of(
                                 "eventType", eventType,
-                                "userId", userId.toString(),
-                                "todoId", todoId.toString(),
+                                "userId",    userId.toString(),
+                                "todoId",    todoId.toString(),
                                 "eventDate", eventDate.toString()
                         ))
                         .withStreamKey(STREAM_KEY)
@@ -47,9 +49,9 @@ public class StatsStreamPublisher {
     public void initConsumerGroups() {
         ensureStreamExists();
         initGroup(WEEKLY_GROUP);
+        initGroup(RANKING_GROUP);
     }
 
-    // 스트림이 없으면 consumer group 생성 자체가 실패하므로 먼저 스트림을 보장
     private void ensureStreamExists() {
         try {
             if (!Boolean.TRUE.equals(redisTemplate.hasKey(STREAM_KEY))) {
