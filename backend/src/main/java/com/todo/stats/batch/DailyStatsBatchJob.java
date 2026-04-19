@@ -180,25 +180,25 @@ public class DailyStatsBatchJob {
                     int lastYear = lastWeekDate.get(IsoFields.WEEK_BASED_YEAR);
                     int lastWeek = lastWeekDate.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
 
-                    // freeze 중인 유저 처리 (2주 연속 미달성 → streak 리셋)
-                    List<StreakStat> freezedStats = streakStatRepository.findAllFreezed();
-                    for (StreakStat streak : freezedStats) {
-                        if (streak.getFreezeYear() == null) continue;
+                    // freeze 중인 유저 처리 (2주 전 freeze 시작 후 아직 freeze 상태 → streak 리셋)
+                    // 저번주에 달성했으면 achieved 처리 구간에서 이미 freeze 해제됨
+                    // → 2주 전에 freeze 시작됐는데 아직 freeze 상태 = 저번주도 미달성 보장
+                    LocalDate twoWeeksAgo = LocalDate.now().minusWeeks(2);
+                    int twoWeeksAgoYear = twoWeeksAgo.get(IsoFields.WEEK_BASED_YEAR);
+                    int twoWeeksAgoWeek = twoWeeksAgo.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
 
-                        boolean isSecondMiss = streak.getFreezeYear() == lastYear
-                                && streak.getFreezeWeek() == lastWeek;
-                        if (isSecondMiss) {
-                            // 2주 연속 미달성 → streak 리셋
-                            streak.setCurrentStreak(0);
-                            streak.setFreezed(false);
-                            streak.setFreezeWeek(null);
-                            streak.setFreezeYear(null);
-                            streak.setLastWeekAchieved(null);
-                            streak.setLastYearAchieved(null);
-                            streak.setUpdatedAt(LocalDateTime.now());
-                            streakStatRepository.save(streak);
-                        }
-                        // freeze 1주차 → 유지 (아무것도 안 함)
+                    List<StreakStat> toReset = streakStatRepository
+                            .findByFreezedTrueAndFreezeYearAndFreezeWeek(twoWeeksAgoYear, twoWeeksAgoWeek);
+
+                    for (StreakStat streak : toReset) {
+                        streak.setCurrentStreak(0);
+                        streak.setFreezed(false);
+                        streak.setFreezeWeek(null);
+                        streak.setFreezeYear(null);
+                        streak.setLastWeekAchieved(null);
+                        streak.setLastYearAchieved(null);
+                        streak.setUpdatedAt(LocalDateTime.now());
+                        streakStatRepository.save(streak);
                     }
 
                     // 직전 주에 goal_achieved한 유저 처리
@@ -264,8 +264,8 @@ public class DailyStatsBatchJob {
                         }
                     }
 
-                    log.info("streak_stats updated: achieved={}, freezeProcessed={}",
-                            achievedStats.size(), freezedStats.size());
+                    log.info("streak_stats updated: achieved={}, streakReset={}, freezeSet={}",
+                            achievedStats.size(), toReset.size(), missedStats.size());
                     return RepeatStatus.FINISHED;
                 }, transactionManager)
                 .build();
