@@ -15,7 +15,6 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
     secrets:
       - postgres_password
       - jwt_secret
@@ -25,7 +24,6 @@ services:
       - |
         export POSTGRES_PASSWORD=$$(cat /run/secrets/postgres_password)
         export JWT_SECRET=$$(cat /run/secrets/jwt_secret)
-        export DATABASE_URL=postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/$$POSTGRES_DB
         exec java -jar app.jar
     ports:
       - "8080:8080"

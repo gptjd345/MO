@@ -132,7 +132,7 @@ for (int i = 0; i < weeks; i++) {
 매주 월요일 streakStatsStep 실행:
 
 직전 주 goal_achieved = true  → currentStreak + 1, freeze 해제
-직전 주 goal_achieved = false (활동은 있었음):
+직전 주 goal_achieved = false (활동 여부 무관):
     is_freezed = false → freeze 시작 (streak 유지, is_freezed = true)
     is_freezed = true  → 2주 연속 미달성 → streak 리셋 (currentStreak = 0)
 ```
