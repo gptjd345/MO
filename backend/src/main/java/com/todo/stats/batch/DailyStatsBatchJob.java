@@ -237,18 +237,10 @@ public class DailyStatsBatchJob {
                         streakStatRepository.save(streak);
                     }
 
-                    // 직전 주에 활동은 있었지만 goal_achieved 못한 유저 (freeze 시작)
-                    List<Long> achievedUserIds = achievedStats.stream()
-                            .map(WeeklyStat::getUserId).toList();
-
+                    // 저번주 goalAchieved = false이고 currentStreak > 0인 유저 → freeze 부여
+                    // 활동 여부와 무관하게 목표 달성 여부만으로 판단
                     List<WeeklyStat> missedStats = weeklyStatRepository
-                            .findAll().stream()
-                            .filter(w -> w.getYear() == lastYear
-                                    && w.getWeekNumber() == lastWeek
-                                    && !w.isGoalAchieved()
-                                    && w.getCompletedCount() > 0)
-                            .filter(w -> !achievedUserIds.contains(w.getUserId()))
-                            .toList();
+                            .findByYearAndWeekNumberAndGoalAchievedFalse(lastYear, lastWeek);
 
                     for (WeeklyStat weekly : missedStats) {
                         Long userId = weekly.getUserId();

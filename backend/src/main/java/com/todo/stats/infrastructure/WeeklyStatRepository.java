@@ -24,4 +24,8 @@ public interface WeeklyStatRepository extends JpaRepository<WeeklyStat, Long> {
     List<WeeklyStat> findFromWeek(@Param("userId") Long userId,
                                   @Param("year") int year,
                                   @Param("weekNumber") int weekNumber);
+
+    @Query("SELECT w FROM WeeklyStat w WHERE w.year = :year AND w.weekNumber = :weekNumber AND w.goalAchieved = false")
+    List<WeeklyStat> findByYearAndWeekNumberAndGoalAchievedFalse(@Param("year") int year,
+                                                                  @Param("weekNumber") int weekNumber);
 }
