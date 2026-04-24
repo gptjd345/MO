@@ -6,7 +6,6 @@ import com.todo.exception.CustomException;
 import com.todo.exception.ErrorCode;
 import com.todo.repository.UserRepository;
 import com.todo.service.AuthService;
-import com.todo.service.JwtService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,12 +26,10 @@ public class AuthController {
     private static final int REFRESH_MAX_AGE   = 7 * 24 * 60 * 60; // 7일(초)
 
     private final AuthService authService;
-    private final JwtService jwtService;
     private final UserRepository userRepository;
 
-    public AuthController(AuthService authService, JwtService jwtService, UserRepository userRepository) {
+    public AuthController(AuthService authService, UserRepository userRepository) {
         this.authService = authService;
-        this.jwtService = jwtService;
         this.userRepository = userRepository;
     }
 
