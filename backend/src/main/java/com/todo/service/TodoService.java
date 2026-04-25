@@ -10,8 +10,10 @@ import com.todo.exception.CustomException;
 import com.todo.exception.ErrorCode;
 import com.todo.repository.TodoRepository;
 import com.todo.repository.UserRepository;
+import com.todo.event.EventPublisher;
+import com.todo.event.TodoCanceledEvent;
+import com.todo.event.TodoCompletedEvent;
 import com.todo.stats.domain.TodoEvent;
-import com.todo.publisher.TodoEventPublisher;
 import com.todo.stats.infrastructure.TodoEventRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.slf4j.Logger;
@@ -36,16 +38,16 @@ public class TodoService {
     private final TodoRepository todoRepository;
     private final UserRepository userRepository;
     private final TodoEventRepository todoEventRepository;
-    private final TodoEventPublisher todoEventPublisher;
+    private final EventPublisher eventPublisher;
 
     public TodoService(TodoRepository todoRepository,
                        UserRepository userRepository,
                        TodoEventRepository todoEventRepository,
-                       TodoEventPublisher todoEventPublisher) {
+                       EventPublisher eventPublisher) {
         this.todoRepository = todoRepository;
         this.userRepository = userRepository;
         this.todoEventRepository = todoEventRepository;
-        this.todoEventPublisher = todoEventPublisher;
+        this.eventPublisher = eventPublisher;
     }
 
     public List<Todo> getTodos(Long userId) {
@@ -160,7 +162,7 @@ public class TodoService {
             // weekly-group(주간통계)과 ranking-group(랭킹)이 동일 이벤트를 독립적으로 소비
             for (Long todoId : newlyCompletedIds) {
                 try {
-                    todoEventPublisher.publishCompleted(userId, todoId, today);
+                    eventPublisher.publish(new TodoCompletedEvent(userId, todoId, today));
                 } catch (Exception e) {
                     log.warn("Event publish failed for todoId={}: {}", todoId, e.getMessage());
                 }
@@ -204,8 +206,7 @@ public class TodoService {
 
             for (long[] pair : undonePairs) {
                 try {
-                    todoEventPublisher.publishUncompleted(
-                            userId, pair[0], LocalDate.ofEpochDay(pair[1]));
+                    eventPublisher.publish(new TodoCanceledEvent(userId, pair[0], LocalDate.ofEpochDay(pair[1])));
                 } catch (Exception e) {
                     log.warn("Event publish failed for todoId={}: {}", pair[0], e.getMessage());
                 }

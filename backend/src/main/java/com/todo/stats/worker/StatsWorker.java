@@ -1,7 +1,8 @@
 package com.todo.stats.worker;
 
-import com.todo.publisher.TodoEventPublisher;
-import jakarta.annotation.PostConstruct;
+import com.todo.messaging.ConsumerGroupInitializer;
+import com.todo.messaging.ConsumerGroups;
+import com.todo.messaging.StreamNames;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Range;
@@ -27,21 +28,16 @@ public class StatsWorker {
     private static final Duration IDLE_THRESHOLD = Duration.ofSeconds(30);
     private static final long MAX_DELIVERY_COUNT = 3;
 
-    private final TodoEventPublisher statsStreamPublisher;
     private final StatsProcessor statsProcessor;
     private final StringRedisTemplate redisTemplate;
+    private final ConsumerGroupInitializer consumerGroupInitializer;
 
-    public StatsWorker(TodoEventPublisher statsStreamPublisher,
-                       StatsProcessor statsProcessor,
-                       StringRedisTemplate redisTemplate) {
-        this.statsStreamPublisher = statsStreamPublisher;
+    public StatsWorker(StatsProcessor statsProcessor,
+                       StringRedisTemplate redisTemplate,
+                       ConsumerGroupInitializer consumerGroupInitializer) {
         this.statsProcessor = statsProcessor;
         this.redisTemplate = redisTemplate;
-    }
-
-    @PostConstruct
-    public void init() {
-        statsStreamPublisher.initConsumerGroups();
+        this.consumerGroupInitializer = consumerGroupInitializer;
     }
 
     @SuppressWarnings("unchecked")
@@ -49,9 +45,9 @@ public class StatsWorker {
     public void pollWeeklyStats() {
         try {
             List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream()
-                    .read(Consumer.from(TodoEventPublisher.WEEKLY_GROUP, "weekly-consumer"),
+                    .read(Consumer.from(ConsumerGroups.STATS, "stats-consumer"),
                             StreamReadOptions.empty().count(BATCH_SIZE),
-                            StreamOffset.create(TodoEventPublisher.STREAM_KEY, ReadOffset.lastConsumed()));
+                            StreamOffset.create(StreamNames.TODO, ReadOffset.lastConsumed()));
 
             if (records == null || records.isEmpty()) return;
             for (MapRecord<String, Object, Object> record : records) {
@@ -59,7 +55,7 @@ public class StatsWorker {
             }
         } catch (Exception e) {
             if (e.getMessage() != null && e.getMessage().contains("NOGROUP")) {
-                statsStreamPublisher.initConsumerGroups();
+                consumerGroupInitializer.init();
             }
             log.warn("Weekly stream poll failed: {}", e.getMessage());
         }
@@ -67,7 +63,7 @@ public class StatsWorker {
 
     @Scheduled(fixedDelay = 60_000)
     public void retryPendingWeeklyStats() {
-        retryPending(TodoEventPublisher.WEEKLY_GROUP, "weekly-consumer",
+        retryPending(ConsumerGroups.STATS, "stats-consumer",
                 statsProcessor::processWeeklyStats);
     }
 
@@ -76,7 +72,7 @@ public class StatsWorker {
                               java.util.function.Consumer<MapRecord<String, Object, Object>> processor) {
         try {
             PendingMessages pending = redisTemplate.opsForStream().pending(
-                    TodoEventPublisher.STREAM_KEY, group,
+                    StreamNames.TODO, group,
                     Range.unbounded(), BATCH_SIZE);
 
             if (pending == null || !pending.iterator().hasNext()) return;
@@ -87,14 +83,13 @@ public class StatsWorker {
                 if (msg.getTotalDeliveryCount() >= MAX_DELIVERY_COUNT) {
                     log.error("Poison pill abandoned: group={} messageId={} deliveries={}",
                             group, msg.getId(), msg.getTotalDeliveryCount());
-                    redisTemplate.opsForStream().acknowledge(
-                            TodoEventPublisher.STREAM_KEY, group, msg.getId());
+                    redisTemplate.opsForStream().acknowledge(StreamNames.TODO, group, msg.getId());
                     continue;
                 }
 
                 List<MapRecord<String, Object, Object>> claimed =
                         (List<MapRecord<String, Object, Object>>) (List<?>) redisTemplate.opsForStream()
-                                .claim(TodoEventPublisher.STREAM_KEY, group, consumerName,
+                                .claim(StreamNames.TODO, group, consumerName,
                                         IDLE_THRESHOLD, msg.getId());
 
                 if (claimed != null) {
