@@ -14,9 +14,9 @@
     ↓
 todo_events INSERT  ←── source of truth (PostgreSQL, 영속)
     ↓
-Redis Streams (todo:events)
+Redis Streams (todo-stream)
     ├── ranking-group  → Redis ZSET 실시간 업데이트
-    └── weekly-group   → weekly_stats 실시간 업데이트
+    └── stats-group    → weekly_stats 실시간 업데이트
 
 Spring Batch (매일 새벽 1시)
     ├── weeklyStatsStep  → todo_events 기준 weekly_stats 재계산
@@ -47,9 +47,9 @@ Redis Streams를 선택한 이유:
 
 ---
 
-## Redis Streams — weekly-group 컨슈머
+## Redis Streams — stats-group 컨슈머
 
-`weekly-group` 컨슈머는 `COMPLETED` / `UNCOMPLETED` 이벤트를 받아 `weekly_stats`를 실시간 갱신합니다.
+`stats-group` 컨슈머는 `COMPLETED` / `UNCOMPLETED` 이벤트를 받아 `weekly_stats`를 실시간 갱신합니다.
 
 ```
 COMPLETED  → completedCount + 1, goalAchieved 재평가
