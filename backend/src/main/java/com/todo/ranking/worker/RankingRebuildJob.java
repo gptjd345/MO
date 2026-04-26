@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import com.todo.ranking.domain.RankingDtos.UserScoreRow;
+import com.todo.ranking.domain.RankingScoreRow;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -31,7 +31,7 @@ public class RankingRebuildJob {
         try {
             Map<Long, Integer> userScores = userRepository.findIdAndScoreOfActiveUsers()
                     .stream()
-                    .collect(Collectors.toMap(UserScoreRow::id, UserScoreRow::score));
+                    .collect(Collectors.toMap(RankingScoreRow::id, RankingScoreRow::score));
 
             rankingRepository.buildNew(userScores);
             rankingRepository.swapAndExpire();
