@@ -2,7 +2,8 @@ package com.todo.stats.worker;
 
 import com.todo.stats.domain.WeeklyGoal;
 import com.todo.stats.domain.WeeklyStat;
-import com.todo.publisher.TodoEventPublisher;
+import com.todo.messaging.ConsumerGroups;
+import com.todo.messaging.StreamNames;
 import com.todo.stats.infrastructure.WeeklyGoalRepository;
 import com.todo.stats.infrastructure.WeeklyStatRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,7 +71,7 @@ class StatsProcessorTest {
         @SuppressWarnings("unchecked")
         MapRecord<String, Object, Object> record = mock(MapRecord.class);
         when(record.getValue()).thenReturn(body);
-        when(record.getStream()).thenReturn(TodoEventPublisher.STREAM_KEY);
+        when(record.getStream()).thenReturn(StreamNames.TODO);
         when(record.getId()).thenReturn(RecordId.of("1-0"));
         return record;
     }
@@ -127,8 +128,8 @@ class StatsProcessorTest {
             // DB 저장 없이 ACK만 발행되어야 한다
             verify(weeklyStatRepository, never()).save(any());
             verify(streamOperations).acknowledge(
-                    eq(TodoEventPublisher.STREAM_KEY),
-                    eq(TodoEventPublisher.WEEKLY_GROUP),
+                    eq(StreamNames.TODO),
+                    eq(ConsumerGroups.STATS),
                     any(RecordId.class));
         }
     }
@@ -259,8 +260,8 @@ class StatsProcessorTest {
             // then
             verify(streamOperations, times(1))
                     .acknowledge(
-                            eq(TodoEventPublisher.STREAM_KEY),
-                            eq(TodoEventPublisher.WEEKLY_GROUP),
+                            eq(StreamNames.TODO),
+                            eq(ConsumerGroups.STATS),
                             any(RecordId.class));
         }
     }

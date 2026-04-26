@@ -28,7 +28,7 @@ public enum ErrorCode {
     TODO_ALREADY_COMPLETED(HttpStatus.BAD_REQUEST, "Completed todos cannot be deleted. Undo first."),
 
     // Stats : 400
-    GOAL_SETTING_LOCKED(HttpStatus.BAD_REQUEST, "Goal can only be set on Monday of target week or Sunday before next week");
+    GOAL_SETTING_LOCKED(HttpStatus.BAD_REQUEST, "Goal can only be set onTodoCanceled Monday of target week or Sunday before next week");
 
     private final HttpStatus status;
     private final String defaultMessage;

@@ -10,7 +10,6 @@ import com.todo.exception.CustomException;
 import com.todo.exception.ErrorCode;
 import com.todo.repository.TodoRepository;
 import com.todo.repository.UserRepository;
-import com.todo.event.EventPublisher;
 import com.todo.event.TodoCanceledEvent;
 import com.todo.event.TodoCompletedEvent;
 import com.todo.stats.domain.TodoEvent;
@@ -18,6 +17,7 @@ import com.todo.stats.infrastructure.TodoEventRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -38,16 +38,16 @@ public class TodoService {
     private final TodoRepository todoRepository;
     private final UserRepository userRepository;
     private final TodoEventRepository todoEventRepository;
-    private final EventPublisher eventPublisher;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public TodoService(TodoRepository todoRepository,
                        UserRepository userRepository,
                        TodoEventRepository todoEventRepository,
-                       EventPublisher eventPublisher) {
+                       ApplicationEventPublisher applicationEventPublisher) {
         this.todoRepository = todoRepository;
         this.userRepository = userRepository;
         this.todoEventRepository = todoEventRepository;
-        this.eventPublisher = eventPublisher;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     public List<Todo> getTodos(Long userId) {
@@ -161,11 +161,7 @@ public class TodoService {
             // 단일 이벤트를 todo:events 스트림에 발행
             // weekly-group(주간통계)과 ranking-group(랭킹)이 동일 이벤트를 독립적으로 소비
             for (Long todoId : newlyCompletedIds) {
-                try {
-                    eventPublisher.publish(new TodoCompletedEvent(userId, todoId, today));
-                } catch (Exception e) {
-                    log.warn("Event publish failed for todoId={}: {}", todoId, e.getMessage());
-                }
+                applicationEventPublisher.publishEvent(new TodoCompletedEvent(userId, todoId, today));
             }
         }
 
@@ -205,11 +201,7 @@ public class TodoService {
             userRepository.save(user);
 
             for (long[] pair : undonePairs) {
-                try {
-                    eventPublisher.publish(new TodoCanceledEvent(userId, pair[0], LocalDate.ofEpochDay(pair[1])));
-                } catch (Exception e) {
-                    log.warn("Event publish failed for todoId={}: {}", pair[0], e.getMessage());
-                }
+                applicationEventPublisher.publishEvent(new TodoCanceledEvent(userId, pair[0], LocalDate.ofEpochDay(pair[1])));
             }
         }
 

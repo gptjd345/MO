@@ -88,13 +88,13 @@ public class PaymentService {
                 lastException = null;
                 break;
             } catch (PgTimeoutException e) {
-                log.warn("PG timeout on attempt {}/{} for key={}", attempt, MAX_RETRIES, idempotencyKey);
+                log.warn("PG timeout onTodoCanceled attempt {}/{} for key={}", attempt, MAX_RETRIES, idempotencyKey);
                 lastException = e;
                 if (attempt < MAX_RETRIES) {
                     sleepBackoff(attempt);
                 }
             } catch (PgSystemException e) {
-                log.warn("PG system error on attempt {}/{} for key={}", attempt, MAX_RETRIES, idempotencyKey);
+                log.warn("PG system error onTodoCanceled attempt {}/{} for key={}", attempt, MAX_RETRIES, idempotencyKey);
                 lastException = e;
                 if (attempt < MAX_RETRIES) {
                     sleepBackoff(attempt);
