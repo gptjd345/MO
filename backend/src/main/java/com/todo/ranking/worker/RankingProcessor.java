@@ -46,11 +46,10 @@ public class RankingProcessor {
 
             rankingRepository.updateScore(userId, score);
             log.debug("Ranking updated: userId={}, score={}", userId, score);
+
+            redisTemplate.opsForStream().acknowledge(message.getStream(), ConsumerGroups.RANKING, message.getId());
         } catch (Exception e) {
             log.error("Failed to process ranking event messageId={}", message.getId(), e);
-        } finally {
-            redisTemplate.opsForStream().acknowledge(
-                    message.getStream(), ConsumerGroups.RANKING, message.getId());
         }
     }
 }
