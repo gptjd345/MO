@@ -26,7 +26,6 @@ public class PaymentService {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
     private static final Long PRO_PLAN_AMOUNT = 9900L;
-    private static final int MAX_RETRIES = 3;
 
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
@@ -77,34 +76,21 @@ public class PaymentService {
             paymentRepository.save(payment);
         }
 
-        PgResult result = null;
-        Exception lastException = null;
-
-        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                String scopedKey = userId + ":" + idempotencyKey;
-                PgRequest pgRequest = new PgRequest(scopedKey, PRO_PLAN_AMOUNT, "TaskFlow Pro Plan");
-                result = pgClient.requestPayment(pgRequest);
-                lastException = null;
-                break;
-            } catch (PgTimeoutException e) {
-                log.warn("PG timeout onTodoCanceled attempt {}/{} for key={}", attempt, MAX_RETRIES, idempotencyKey);
-                lastException = e;
-                if (attempt < MAX_RETRIES) {
-                    sleepBackoff(attempt);
-                }
-            } catch (PgSystemException e) {
-                log.warn("PG system error onTodoCanceled attempt {}/{} for key={}", attempt, MAX_RETRIES, idempotencyKey);
-                lastException = e;
-                if (attempt < MAX_RETRIES) {
-                    sleepBackoff(attempt);
-                }
-            }
-        }
-
-        if (lastException != null) {
+        PgResult result;
+        try {
+            String scopedKey = userId + ":" + idempotencyKey;
+            PgRequest pgRequest = new PgRequest(scopedKey, PRO_PLAN_AMOUNT, "TaskFlow Pro Plan");
+            result = pgClient.requestPayment(pgRequest);
+        } catch (PgTimeoutException e) {
+            log.warn("PG timeout for key={}", idempotencyKey);
             payment.setStatus("FAIL");
-            payment.setFailReason("SYSTEM_ERROR_AFTER_RETRIES");
+            payment.setFailReason("PG_TIMEOUT");
+            paymentRepository.save(payment);
+            return toResponse(payment);
+        } catch (PgSystemException e) {
+            log.warn("PG system error for key={}", idempotencyKey);
+            payment.setStatus("FAIL");
+            payment.setFailReason("PG_SYSTEM_ERROR");
             paymentRepository.save(payment);
             return toResponse(payment);
         }
@@ -151,12 +137,4 @@ public class PaymentService {
         );
     }
 
-    private void sleepBackoff(int attempt) {
-        try {
-            long delay = (long) Math.pow(2, attempt) * 100;
-            Thread.sleep(delay);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-    }
 }
