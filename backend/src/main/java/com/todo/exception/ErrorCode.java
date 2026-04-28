@@ -14,6 +14,7 @@ public enum ErrorCode {
     // Auth : 401
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid email or password"),
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token"),
+    INVALID_CURRENT_PASSWORD(HttpStatus.UNAUTHORIZED, "Current password is incorrect"),
 
     // Todo : 403
     FORBIDDEN(HttpStatus.FORBIDDEN, "Access denied"),

@@ -1,5 +1,6 @@
 package com.todo.service;
 
+import com.todo.dto.ChangePasswordRequest;
 import com.todo.dto.LoginRequest;
 import com.todo.dto.RegisterRequest;
 import com.todo.dto.TokenPair;
@@ -81,6 +82,23 @@ public class AuthService {
 
         refreshTokenRepository.revokeByJti(jti, LocalDateTime.now());
         return issueTokenPair(user);
+    }
+
+    @Transactional
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new CustomException(ErrorCode.INVALID_CURRENT_PASSWORD);
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        userRepository.save(user);
+
+        jwtService.evictTokenVersionCache(userId);
+        refreshTokenRepository.revokeAllByUserId(userId, LocalDateTime.now());
     }
 
     @Transactional

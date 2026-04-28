@@ -8,26 +8,21 @@ import com.todo.entity.Todo;
 import com.todo.entity.User;
 import com.todo.exception.CustomException;
 import com.todo.exception.ErrorCode;
+import com.todo.repository.TodoQueryRepository;
 import com.todo.repository.TodoRepository;
 import com.todo.repository.UserRepository;
 import com.todo.event.TodoCanceledEvent;
 import com.todo.event.TodoCompletedEvent;
 import com.todo.stats.domain.TodoEvent;
 import com.todo.stats.infrastructure.TodoEventRepository;
-import jakarta.persistence.criteria.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -36,15 +31,18 @@ public class TodoService {
     private static final Logger log = LoggerFactory.getLogger(TodoService.class);
 
     private final TodoRepository todoRepository;
+    private final TodoQueryRepository todoQueryRepository;
     private final UserRepository userRepository;
     private final TodoEventRepository todoEventRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
 
     public TodoService(TodoRepository todoRepository,
+                       TodoQueryRepository todoQueryRepository,
                        UserRepository userRepository,
                        TodoEventRepository todoEventRepository,
                        ApplicationEventPublisher applicationEventPublisher) {
         this.todoRepository = todoRepository;
+        this.todoQueryRepository = todoQueryRepository;
         this.userRepository = userRepository;
         this.todoEventRepository = todoEventRepository;
         this.applicationEventPublisher = applicationEventPublisher;
@@ -55,37 +53,7 @@ public class TodoService {
     }
 
     public PagedTodoResponse getTodosPaged(Long userId, boolean completed, int page, int size, String sort, String search) {
-        boolean hasSearch = search != null && !search.isBlank();
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Todo> result;
-
-        if ("priority".equals(sort)) {
-            result = hasSearch
-                    ? todoRepository.findByUserIdAndCompletedAndSearchOrderByPriority(userId, completed, search, pageable)
-                    : todoRepository.findByUserIdAndCompletedOrderByPriority(userId, completed, pageable);
-        } else {
-            Sort springSort = switch (sort) {
-                case "oldest" -> Sort.by("id").ascending();
-                case "name" -> Sort.by("title").ascending();
-                case "deadline" -> Sort.by(Sort.Order.asc("endDate").nullsLast());
-                default -> Sort.by("id").descending();
-            };
-            Specification<Todo> spec = (root, query, cb) -> {
-                List<Predicate> predicates = new ArrayList<>();
-                predicates.add(cb.equal(root.get("userId"), userId));
-                predicates.add(cb.equal(root.get("completed"), completed));
-                if (hasSearch) {
-                    String like = "%" + search.toLowerCase() + "%";
-                    predicates.add(cb.or(
-                            cb.like(cb.lower(root.get("title")), like),
-                            cb.like(cb.lower(cb.coalesce(root.get("content"), "")), like)
-                    ));
-                }
-                return cb.and(predicates.toArray(new Predicate[0]));
-            };
-            result = todoRepository.findAll(spec, PageRequest.of(page, size, springSort));
-        }
-
+        Page<Todo> result = todoQueryRepository.findTodosPaged(userId, completed, search, page, size, sort);
         return new PagedTodoResponse(result.getContent(), result.getTotalElements(), result.getTotalPages());
     }
 
