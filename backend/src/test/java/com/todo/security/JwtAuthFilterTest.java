@@ -2,6 +2,7 @@ package com.todo.security;
 
 import com.todo.repository.UserRepository;
 import com.todo.service.JwtService;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -16,17 +17,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * STRIDE — Tampering / Spoofing
+ * STRIDE — Tampering / Spoofing / Elevation of Privilege
  *
- * 서명이 유효하지 않거나 만료된 토큰으로 접근할 때
- * SecurityContext에 인증 정보가 설정되지 않는지 검증한다.
- *
- * token_version 기반 무효화(비밀번호 변경, 회원 탈퇴 등)는
- * 해당 기능 구현 후 테스트를 추가한다.
+ * 서명이 유효하지 않거나 만료된 토큰, 또는 token_version이 무효화된 토큰으로
+ * 접근할 때 SecurityContext에 인증 정보가 설정되지 않는지 검증한다.
  */
 @ExtendWith(MockitoExtension.class)
 class JwtAuthFilterTest {
@@ -48,14 +47,29 @@ class JwtAuthFilterTest {
     @Test
     @DisplayName("[Tampering/Spoofing] 서명 검증 실패 시 인증이 설정되지 않는다")
     void shouldNotSetAuthentication_whenSignatureVerificationFails() throws Exception {
-        // given — JwtService가 null을 반환 (서명 불일치 또는 만료)
         when(request.getHeader("Authorization")).thenReturn("Bearer invalid.or.expired.token");
         when(jwtService.validateAccessToken(any())).thenReturn(null);
 
-        // when
         filter.doFilterInternal(request, response, filterChain);
 
-        // then
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("[Token Version] 비밀번호 변경 후 구버전 토큰(tv=0)은 인증이 설정되지 않는다")
+    void shouldNotSetAuthentication_whenTokenVersionIsOutdated() throws Exception {
+        // given — tv=0인 토큰이지만 현재 사용자의 token_version은 1 (비밀번호 변경 후)
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("1");
+        when(claims.get("tv", Integer.class)).thenReturn(0);
+        when(request.getHeader("Authorization")).thenReturn("Bearer some.valid.token");
+        when(jwtService.validateAccessToken(any())).thenReturn(claims);
+        when(jwtService.getTokenVersion(1L)).thenReturn(1);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        // then — tv 불일치로 인증 설정 안 됨
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         verify(filterChain).doFilter(request, response);
     }

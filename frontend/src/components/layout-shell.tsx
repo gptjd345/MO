@@ -2,7 +2,7 @@ import { ReactNode, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveTodos, useCompletedTodos } from "@/hooks/use-todos";
 import { Link } from "wouter";
-import { LogOut, LayoutDashboard, CheckCircle2, Crown, Zap, Check, X, Loader2, AlertTriangle, RefreshCw, Star, Heart, Menu, CalendarDays } from "lucide-react";
+import { LogOut, LayoutDashboard, CheckCircle2, Crown, Zap, Check, X, Loader2, AlertTriangle, RefreshCw, Star, Heart, Menu, CalendarDays, Settings } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -410,6 +410,17 @@ export function LayoutShell({ children }: LayoutShellProps) {
           </>
         )}
       </Button>
+
+      <Link href="/profile" onClick={() => setMenuOpen(false)}>
+        <Button
+          variant="ghost"
+          className={`w-full justify-start mb-1 ${location === "/profile" ? "text-white bg-white/5" : "text-muted-foreground"}`}
+          data-testid="button-profile"
+        >
+          <Settings className="mr-2 h-4 w-4" />
+          계정 설정
+        </Button>
+      </Link>
 
       <Button
         variant="ghost"

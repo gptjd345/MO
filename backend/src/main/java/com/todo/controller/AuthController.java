@@ -74,6 +74,15 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
+    @PatchMapping("/password")
+    public ResponseEntity<?> changePassword(@AuthenticationPrincipal User user,
+                                            @Valid @RequestBody ChangePasswordRequest request,
+                                            HttpServletResponse response) {
+        authService.changePassword(user.getId(), request);
+        clearRefreshCookie(response);
+        return ResponseEntity.ok(Map.of("message", "Password changed. Please log in again."));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<?> me(@AuthenticationPrincipal User user) {
         if (user == null) {

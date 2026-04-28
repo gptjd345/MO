@@ -8,6 +8,7 @@ import com.todo.event.TodoCanceledEvent;
 import com.todo.event.TodoCompletedEvent;
 import com.todo.exception.CustomException;
 import com.todo.exception.ErrorCode;
+import com.todo.repository.TodoQueryRepository;
 import com.todo.repository.TodoRepository;
 import com.todo.repository.UserRepository;
 import com.todo.stats.infrastructure.TodoEventRepository;
@@ -35,6 +36,7 @@ import static org.mockito.Mockito.when;
 class TodoServiceTest {
 
     @Mock private TodoRepository todoRepository;
+    @Mock private TodoQueryRepository todoQueryRepository;
     @Mock private UserRepository userRepository;
     @Mock private TodoEventRepository todoEventRepository;
     @Mock private ApplicationEventPublisher applicationEventPublisher;

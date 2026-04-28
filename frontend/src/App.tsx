@@ -11,6 +11,7 @@ import AuthPage from "@/pages/auth-page";
 import DashboardPage from "@/pages/dashboard-page";
 import KeepersPage from "@/pages/keepers-page";
 import CalendarPage from "@/pages/calendar-page";
+import ProfilePage from "@/pages/profile-page";
 import NotFound from "@/pages/not-found";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -43,6 +44,9 @@ function Router() {
       </Route>
       <Route path="/calendar">
         <ProtectedRoute component={CalendarPage} />
+      </Route>
+      <Route path="/profile">
+        <ProtectedRoute component={ProfilePage} />
       </Route>
       <Route component={NotFound} />
     </Switch>
