@@ -203,11 +203,7 @@ public class DailyStatsBatchJob {
 
                     // 직전 주에 goal_achieved한 유저 처리
                     List<WeeklyStat> achievedStats = weeklyStatRepository
-                            .findAll().stream()
-                            .filter(w -> w.getYear() == lastYear
-                                    && w.getWeekNumber() == lastWeek
-                                    && w.isGoalAchieved())
-                            .toList();
+                            .findByYearAndWeekNumberAndGoalAchievedTrue(lastYear, lastWeek);
 
                     for (WeeklyStat weekly : achievedStats) {
                         Long userId = weekly.getUserId();
