@@ -79,8 +79,6 @@ services:
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_prod_data:/prometheus
-    ports:
-      - "9090:9090"
   grafana:
     image: grafana/grafana
     restart: always
@@ -98,8 +96,9 @@ services:
   pushgateway:
     image: prom/pushgateway
     restart: always
-    ports:
-      - "9091:9091"
+    # Prometheus를 별도 EC2로 분리 시 아래 ports 활성화 (Security Group에서 모니터링 서버 IP만 허용)
+    # ports:
+    #   - "9091:9091"
 
   node-exporter:
     image: prom/node-exporter
@@ -114,8 +113,9 @@ services:
       - '--path.sysfs=/host/sys'
       - '--path.rootfs=/rootfs'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-    ports:
-      - "9100:9100"
+    # Prometheus를 별도 EC2로 분리 시 아래 ports 활성화 (Security Group에서 모니터링 서버 IP만 허용)
+    # ports:
+    #   - "9100:9100"
 
 volumes:
   postgres_prod_data:

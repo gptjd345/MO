@@ -33,7 +33,7 @@ public class TodoQueryRepository {
         if (search != null && !search.isBlank()) {
             where.and(
                 todo.title.containsIgnoreCase(search)
-                    .or(todo.content.coalesce("").containsIgnoreCase(search))
+                    .or(todo.content.isNotNull().and(todo.content.containsIgnoreCase(search)))
             );
         }
 
