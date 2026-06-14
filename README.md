@@ -242,6 +242,7 @@ npm run dev   # http://localhost:3000
 | Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3002 |
 | Pushgateway | http://localhost:9091 |
+| Swagger UI | http://localhost:8080/swagger-ui/index.html |
 
 ## 환경 변수
 
