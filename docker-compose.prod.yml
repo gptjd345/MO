@@ -68,37 +68,37 @@ services:
       timeout: 5s
       retries: 5
 
-  prometheus:
-    image: prom/prometheus
-    restart: always
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=15d'
-      - '--storage.tsdb.retention.size=512MB'
-      - '--web.enable-lifecycle'
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_prod_data:/prometheus
-  grafana:
-    image: grafana/grafana
-    restart: always
-    volumes:
-      - grafana_prod_data:/var/lib/grafana
-      - ./monitoring/provisioning:/etc/grafana/provisioning
-      - ./monitoring/grafana-dashboard.json:/etc/grafana/dashboards/mo-dashboard.json
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
-    depends_on:
-      - prometheus
+  # prometheus:
+  #   image: prom/prometheus
+  #   restart: always
+  #   command:
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #     - '--storage.tsdb.retention.time=15d'
+  #     - '--storage.tsdb.retention.size=512MB'
+  #     - '--web.enable-lifecycle'
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+  #     - prometheus_prod_data:/prometheus
+
+  # grafana:
+  #   image: grafana/grafana
+  #   restart: always
+  #   volumes:
+  #     - grafana_prod_data:/var/lib/grafana
+  #     - ./monitoring/provisioning:/etc/grafana/provisioning
+  #     - ./monitoring/grafana-dashboard.json:/etc/grafana/dashboards/mo-dashboard.json
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+  #   depends_on:
+  #     - prometheus
 
   pushgateway:
     image: prom/pushgateway
     restart: always
-    # Prometheus를 별도 EC2로 분리 시 아래 ports 활성화 (Security Group에서 모니터링 서버 IP만 허용)
-    # ports:
-    #   - "9091:9091"
+    ports:
+      - "9091:9091"
 
   node-exporter:
     image: prom/node-exporter
@@ -113,12 +113,9 @@ services:
       - '--path.sysfs=/host/sys'
       - '--path.rootfs=/rootfs'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-    # Prometheus를 별도 EC2로 분리 시 아래 ports 활성화 (Security Group에서 모니터링 서버 IP만 허용)
-    # ports:
-    #   - "9100:9100"
+    ports:
+      - "9100:9100"
 
 volumes:
   postgres_prod_data:
   redis_prod_data:
-  prometheus_prod_data:
-  grafana_prod_data:
