@@ -9,7 +9,7 @@ secrets:
 services:
   spring:
     image: ${SPRING_IMAGE}   # ex) yourdockerhubid/mo-api:latest
-    restart: always
+    restart: no
     env_file: .env.prod
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -41,7 +41,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    restart: always
+    restart: no
     env_file: .env.prod
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -59,7 +59,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    restart: always
+    restart: no
     volumes:
       - redis_prod_data:/data
     healthcheck:
@@ -96,13 +96,13 @@ services:
 
   pushgateway:
     image: prom/pushgateway
-    restart: always
+    restart: no
     ports:
       - "9091:9091"
 
   node-exporter:
     image: prom/node-exporter
-    restart: always
+    restart: no
     pid: host
     volumes:
       - /proc:/host/proc:ro

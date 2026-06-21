@@ -21,7 +21,7 @@ public class JwtService {
     private final UserRepository userRepository;
     private final SecretKey signingKey;
 
-    private static final long ACCESS_TOKEN_MS  = 15 * 60 * 1000L;
+    private static final long ACCESS_TOKEN_MS  = 60 * 60 * 1000L; // TODO: revert after load test(15 min)
     private static final long REFRESH_TOKEN_MS = 7 * 24 * 60 * 60 * 1000L;
     private static final String TOKEN_VERSION_PREFIX = "tv:";
 
